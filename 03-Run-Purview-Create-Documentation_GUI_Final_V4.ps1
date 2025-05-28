@@ -199,9 +199,9 @@ function Test-ModuleInstalled {
     }
 }
 
-Ensure-Module -ModuleName "ExchangeOnlineManagement"
+Test-ModuleInstalled -ModuleName "ExchangeOnlineManagement"
 Import-Module ExchangeOnlineManagement
-Ensure-Module -ModuleName "ImportExcel"
+Test-ModuleInstalled -ModuleName "ImportExcel"
 Import-Module ImportExcel
 
 if ($DryRun) {
@@ -261,7 +261,7 @@ function Import-LabelsFromExcel {
 
         if ($importedLabels.Count -gt 0) {
             $script:allLabels = $importedLabels
-            Update-LabelList -source $script:allLabels
+            Refreshing-LabelList -source $script:allLabels
             Log "📥 $($importedLabels.Count) gültige Labels aus Excel übernommen." "INFO"
         } else {
             Log "⚠️ Keine gültigen Labels aus Excel importiert." "WARNING"
@@ -283,7 +283,7 @@ function Import-LabelsFromExcel {
 # === SplashScreen ===
 
 
-function Start-SplashInThread {
+function Show-SplashScreen {
     param (
         [bool]$UseProgressBar = $false,
         [int]$AutoCloseAfterSeconds = 60,
@@ -724,7 +724,7 @@ catch {
 
         if ($fileDialog.ShowDialog() -eq 'OK') {
             Import-LabelsFromExcel -FilePath $fileDialog.FileName
-            Update-LabelList -source $script:allLabels
+            Refreshing-LabelList -source $script:allLabels
             Log "✅ Excel-Datei geladen: $($fileDialog.FileName)" "SUCCESS"
         }
     })
@@ -765,7 +765,7 @@ $btnCancel.Add_Click({
 })
 
 # === List aktualisieren
-function Update-LabelList {
+function Refreshing-LabelList {
     param([System.Collections.IEnumerable]$source)
 
     $listbox.Items.Clear()
@@ -794,7 +794,7 @@ function Update-LabelList {
 }
 
 $btnApplyFilter.Add_Click({
-    Update-LabelList -source $script:allLabels
+    Refreshing-LabelList -source $script:allLabels
 })
 
 # === Auswahl übernehmen
@@ -825,7 +825,7 @@ $form.Add_FormClosing({
 })
 
 # === Erster Listaufbau bei Start
-Update-LabelList -source $script:allLabels
+Refreshing-LabelList -source $script:allLabels
 $form.ShowDialog() | Out-Null
 
 if ($script:WasAbgebrochen) {
@@ -869,7 +869,7 @@ Connect-MFASessions
 # === GUI nutzen? Dann Werte überschreiben
 if ($UseLabelGUI) {
     Log "🧭 Lade GUI Ansicht, bitte einen Moment Geduld..." "INFO"
-    Start-SplashInThread -UseProgressBar:$UseProgressBar `
+    Show-SplashScreen -UseProgressBar:$UseProgressBar `
                          -AutoCloseAfterSeconds:$AutoCloseAfterSeconds `
                          -CompanyLogoPath $CompanyLogoPath `
                          -CompanyLogoUrl $CompanyLogoUrl `
