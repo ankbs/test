@@ -102,16 +102,16 @@ function Log {
     Write-Host $logEntry -Encoding utf8
 }
 
-function Handle-Error {
+function Write-ErrorLog {
     param([string]$Message, [System.Exception]$ErrorObject)
     Log "$Message $($ErrorObject.Exception.Message)" "ERROR"
     exit 1
 }
 
 # === PRIORITÄTENPARSER ===
-function Read-PriorityInfo {
+function Get-LabelPriorityInfo{
     param(
-        [string]$Input,
+        # [string]$Input,
         [int[]]$AvailablePriorities
     )
 
@@ -192,7 +192,7 @@ function Test-ModuleInstalled {
             Install-Module -Name $ModuleName -Scope CurrentUser -Force -AllowClobber
             Log "✅ Modul '$ModuleName' installiert." "SUCCESS"
         } catch {
-            Handle-Error "Modulinstallation fehlgeschlagen" $_
+            Write-ErrorLog "Modulinstallation fehlgeschlagen" $_
         }
     } else {
         Log "✅ Modul '$ModuleName' ist bereits installiert." "DEBUG"
@@ -271,7 +271,7 @@ function Import-LabelsFromExcel {
             Log "⚠️ Nicht gefundene Labels (Excel): $($notFound -join ', ')" "DEBUG"
         }
     } catch {
-        Handle-Error "Fehler beim Import oder Verarbeiten der Excel-Datei" $_
+        Write-ErrorLog "Fehler beim Import oder Verarbeiten der Excel-Datei" $_
     }
 }
 
@@ -329,7 +329,7 @@ function Start-SplashInThread {
             Write-Host $logEntry
         }
 
-        function Handle-Error {
+        function Write-ErrorLog {
             param([string]$Message, [Parameter(ValueFromPipeline=$true)]$ErrorObject)
             $msg = if ($ErrorObject.Exception) { $ErrorObject.Exception.Message } else { "$ErrorObject" }
             Log "$Message – $msg" "ERROR"
@@ -380,7 +380,7 @@ function Start-SplashInThread {
                 $form.Controls.Add($pic1)
             }
         } catch {
-            Handle-Error "⚠️ Fehler beim Laden des Firmenlogos" $_
+            Write-ErrorLog "⚠️ Fehler beim Laden des Firmenlogos" $_
         }
 
         try {
@@ -408,7 +408,7 @@ function Start-SplashInThread {
                 $form.Controls.Add($picProduct)
             }
         } catch {
-            Handle-Error "⚠️ Fehler beim Laden des Produktlogos" $_
+            Write-ErrorLog "⚠️ Fehler beim Laden des Produktlogos" $_
         }
 
         if (-not $UseProgressBar) {
@@ -424,7 +424,7 @@ function Start-SplashInThread {
                 $form.Controls.Add($pic3)
                 Log "⚙️ Animiertes GIF geladen: $LogoGIFUrl"
             } catch {
-                Handle-Error "⚠️ Fehler beim GIF-Download" $_
+                Write-ErrorLog "⚠️ Fehler beim GIF-Download" $_
             }
         } else {
             $progress = New-Object Windows.Forms.ProgressBar
@@ -456,7 +456,7 @@ function Start-SplashInThread {
                     $form.Invoke({ $form.Close() })
                 }
             } catch {
-                Handle-Error "⚠️ Fehler beim automatischen Schließen des Splashscreens" $_
+                Write-ErrorLog "⚠️ Fehler beim automatischen Schließen des Splashscreens" $_
             }
         })
         $closeTimer.Start()
@@ -466,7 +466,7 @@ function Start-SplashInThread {
                 if ($timer) { $timer.Stop(); $timer.Dispose() }
                 if ($closeTimer) { $closeTimer.Stop(); $closeTimer.Dispose() }
             } catch {
-                Handle-Error "⚠️ Fehler im FormClosing" $_
+                Write-ErrorLog "⚠️ Fehler im FormClosing" $_
             }
             [System.Windows.Forms.Application]::Exit()
         })
@@ -845,10 +845,10 @@ function Connect-MFASessions {
         Connect-IPPSSession -UserPrincipalName $UserPrincipalName
         Log "✅ IPPS verbunden" "SUCCESS"
     } catch {
-        Handle-Error "❌ IPPS Verbindung fehlgeschlagen" $_
+        Write-ErrorLog "❌ IPPS Verbindung fehlgeschlagen" $_
     }
     if (-not (Get-Command Get-Label -ErrorAction SilentlyContinue)) {
-        Handle-Error "❌ Cmdlet 'Get-Label' ist nicht verfügbar" ([System.Exception]::new("Get-Label fehlt"))
+        Write-ErrorLog "❌ Cmdlet 'Get-Label' ist nicht verfügbar" ([System.Exception]::new("Get-Label fehlt"))
     }
 }
 
@@ -938,7 +938,7 @@ if (
     (-not $Priorities) -and
     (-not $UseExistingLabels)
 ) {
-    Handle-Error "❌ Keine gültigen Label-Quellen angegeben. Verwende -UseLabelGUI, -LabelNames oder -Priorities." ([System.Exception]::new("Keine Eingabequelle definiert"))
+    Write-ErrorLog "❌ Keine gültigen Label-Quellen angegeben. Verwende -UseLabelGUI, -LabelNames oder -Priorities." ([System.Exception]::new("Keine Eingabequelle definiert"))
 }
 
 
@@ -1000,7 +1000,7 @@ if ($UseExistingLabels -or $LabelNames.Count -gt 0 -or $UseLabelGUI) {
     }
 
     if (-not $labels -or $labels.Count -eq 0) {
-        Handle-Error "⚠️ Keine Labels gefunden" ([System.Exception]::new("Leere Ergebnismenge"))
+        Write-ErrorLog "⚠️ Keine Labels gefunden" ([System.Exception]::new("Leere Ergebnismenge"))
     }
 }
 
@@ -1036,7 +1036,7 @@ try {
 
     Log "📄 CSV und Excel mit Label-Metadaten exportiert." "SUCCESS" -Encoding utf8
 } catch {
-    Handle-Error "Fehler beim Export der Label-Metadaten" $_
+    Write-ErrorLog "Fehler beim Export der Label-Metadaten" $_
 }
 
 
@@ -1477,7 +1477,7 @@ Microsoft Security & Compliance Automation
         Log "✅ Mail erfolgreich gesendet an $MailTo$(if ($MailCC) { " (CC: $MailCC)" })" "SUCCESS"
     }
     catch {
-        Handle-Error "Fehler beim Mailversand" $_
+        Write-ErrorLog "Fehler beim Mailversand" $_
     }
     finally {
         Remove-Item $utf8BodyPath -Force -ErrorAction SilentlyContinue
