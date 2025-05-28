@@ -109,7 +109,7 @@ function Handle-Error {
 }
 
 # === PRIORITÄTENPARSER ===
-function Parse-Priorities {
+function Read-PriorityInfo {
     param(
         [string]$Input,
         [int[]]$AvailablePriorities
