@@ -1,4 +1,4 @@
-﻿# === Vorbereitungen ===
+# === Vorbereitungen ===
 param(
     [bool]$SendReport = $false,
     [string]$UserPrincipalName,
