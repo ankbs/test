@@ -1,4 +1,10 @@
 # Zentrale Funktionen für Logging, Error-Handling und Modulprüfung
+# === Logging
+if (!(Test-Path $LogFolder)) { New-Item -ItemType Directory -Path $LogFolder -Force | Out-Null }
+$DatumJetzt = Get-Date -Format 'yyyyMMdd_HHmmss'
+$LogFile = Join-Path $LogFolder "StartGUI_$DatumJetzt.log"
+$GuiConfigPath = Join-Path $PSScriptRoot "GUIConfig.json"
+
 
 function Log {
     param([string]$Message, [string]$Level = "INFO")
