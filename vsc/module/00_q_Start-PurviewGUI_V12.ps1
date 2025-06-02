@@ -49,6 +49,9 @@ $MSPPartner     = $MSPPartner     -or $script:DefaultMSPPartner
 $MSPNameAP      = $MSPNameAP      -or $script:DefaultMSPNameAP
 $MSPMail        = $MSPMail        -or $script:DefaultMSPMail
 $MSPURL         = $MSPURL         -or $script:DefaultMSPURL
+$CompanyLogoBase64 = $CompanyLogoBase64 -or $script:DefaultCompanyLogoBase64
+$ProductLogoBase64  = $ProductLogoBase64  -or $script:DefaultProductLogoBase64
+
 
 # === Logging
 if (!(Test-Path $LogFolder)) { New-Item -ItemType Directory -Path $LogFolder -Force | Out-Null }
