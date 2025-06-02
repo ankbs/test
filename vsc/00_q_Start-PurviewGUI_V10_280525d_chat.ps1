@@ -1,6 +1,6 @@
 ﻿<#
 .SYNOPSIS
-Start-GUI für Microsoft Purview Label Tools – WPF-Variante
+ Start-GUI für Microsoft Purview Label Tools – WPF-Variante
 #>
 
 
