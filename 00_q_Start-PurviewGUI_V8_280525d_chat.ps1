@@ -21,6 +21,8 @@ param (
 
 )
 
+
+
 if (!(Test-Path $LogFolder)) { New-Item -ItemType Directory -Path $LogFolder -Force | Out-Null }
 
 
@@ -358,7 +360,8 @@ if (-not $script:Result) {
 # Hauptskript wählen
 switch ($script:Result.Aktion) {
     "Report"     { $mainScript = ".\03-Run-Purview-Create-Documentation_GUI_Final_V9.ps1" }
-    "AddLanguage" { $mainScript = ".\03-Run-Purview-Add-Language.ps1" }
+#    "AddLanguage" { $mainScript = ".\02-Run-PurviewLabelProvisioning_Create_Missing_Config_Only_Language_Final_V1.ps1" }
+    "AddLanguage" { $mainScript = ".\02-Run-PurviewLabelProvisioning_Create_Missing_Config_Only_Language_and_Translation_Final_V9.ps1" }
     "Sortieren"  { $mainScript = ".\03-Run-Purview-Sort-Labels.ps1" }
     default      {
         Write-Error "❌ Keine gültige Aktion ausgewählt!"
