@@ -21,7 +21,7 @@ param(
 if (!(Test-Path $LogFolder)) { New-Item -ItemType Directory -Path $LogFolder -Force | Out-Null }
 $DatumJetzt = Get-Date -Format 'yyyyMMdd_HHmmss'
 $LogFile = Join-Path $LogFolder "PurviewLabelPriorityManager_$DatumJetzt.log"
-function Log {
+function Write-Log {
     param([string]$Message, [string]$Level = "INFO")
     $timestamp = Get-Date -Format 'yyyy-MM-dd HH:mm:ss'
     $prefix = switch ($Level) { "INFO" { "ℹ️" } "SUCCESS" { "✅" } "ERROR" { "❌" } default { "🔹" } }
@@ -32,7 +32,7 @@ function Log {
 
 if (-not $UserPrincipalName) { $UserPrincipalName = Read-Host "🔑 Bitte geben Sie den UserPrincipalName ein" }
 Connect-IPPSSession -UserPrincipalName $UserPrincipalName
-Log "✅ IPPS verbunden" "SUCCESS"
+Write-Log "✅ IPPS verbunden" "SUCCESS"
 
 function Create-ImageFromBase64 {
     param($Base64)
@@ -42,7 +42,7 @@ function Create-ImageFromBase64 {
         $ms = New-Object IO.MemoryStream (,[byte[]]$bytes)
         return [System.Drawing.Image]::FromStream($ms)
     } catch {
-        Log "❌ Fehler beim Konvertieren von Base64-Logo: $_" "ERROR"
+        Write-Log "❌ Fehler beim Konvertieren von Base64-Logo: $_" "ERROR"
         return $null
     }
 }
@@ -181,9 +181,9 @@ $btnLoadLabels.Add_Click({
             $lbl | Add-Member -NotePropertyName "DisplayNameExtended" -NotePropertyValue ("$($lbl.Name) / $($lbl.DisplayName)")
         }
         $lstAllLabels.ItemsSource = $labels
-        Log "✅ Labels geladen (Filter: '$filter')." "SUCCESS"
+        Write-Log "✅ Labels geladen (Filter: '$filter')." "SUCCESS"
     } catch {
-        Log "❌ Fehler beim Laden der Labels: $($_.Exception.Message)" "ERROR"
+        Write-Log "❌ Fehler beim Laden der Labels: $($_.Exception.Message)" "ERROR"
     }
 })
 
@@ -212,34 +212,34 @@ $btnSetPriorities.Add_Click({
 
             if ($childCount -eq 0) {
                 $HighnewPriority = $newPriority + 1
-                Log "ℹ️ Einfaches Label '$($label.Name)' erkannt – neue Priorität: $HighnewPriority" "INFO"
+                Write-Log "ℹ️ Einfaches Label '$($label.Name)' erkannt – neue Priorität: $HighnewPriority" "INFO"
             }
             elseif ($childCount -eq 2) {
                 $HighnewPriority = $newPriority - 3
-                Log "ℹ️ Parentlabel '$($label.Name)' erkannt (2 Childlabels) – Startwert: $HighnewPriority" "INFO"
+                Write-Log "ℹ️ Parentlabel '$($label.Name)' erkannt (2 Childlabels) – Startwert: $HighnewPriority" "INFO"
                 do {
                     $conflict = $allLabels | Where-Object { $_.ParentId -ne $null -and $_.Priority -eq $HighnewPriority }
                     if ($conflict) {
-                        Log "⚠️ Priority $HighnewPriority gehört zu einem Childlabel – Reduziere um 1" "INFO"
+                        Write-Log "⚠️ Priority $HighnewPriority gehört zu einem Childlabel – Reduziere um 1" "INFO"
                         $HighnewPriority--
                     }
                 } while ($conflict)
             }
             else {
                 $HighnewPriority = $newPriority + 1
-                Log "ℹ️ Label '$($label.Name)' mit $childCount Childlabels erkannt – neue Priorität: $HighnewPriority" "INFO"
+                Write-Log "ℹ️ Label '$($label.Name)' mit $childCount Childlabels erkannt – neue Priorität: $HighnewPriority" "INFO"
             }
 
             if ($childCount -gt 0 -or $label.ParentId -eq $null) {
                 Set-Label -Identity $label.Identity -Priority $HighnewPriority
-                Log "✅ Label '$($label.Name)' ($($label.DisplayName)) auf neue Priorität $HighnewPriority gesetzt." "SUCCESS"
+                Write-Log "✅ Label '$($label.Name)' ($($label.DisplayName)) auf neue Priorität $HighnewPriority gesetzt." "SUCCESS"
                 Write-Host "✅ Label '$($label.DisplayName)' auf neue Priority $HighnewPriority gesetzt. 10s Pause…" -ForegroundColor Green
                 Start-Sleep -Seconds 10
             } else {
-                Log "⏭️ Childlabel '$($label.Name)' wird übersprungen (kein Set-Label)." "INFO"
+                Write-Log "⏭️ Childlabel '$($label.Name)' wird übersprungen (kein Set-Label)." "INFO"
             }
         } catch {
-            Log "❌ Fehler bei Label '$($label.Name)': $($_.Exception.Message)" "ERROR"
+            Write-Log "❌ Fehler bei Label '$($label.Name)': $($_.Exception.Message)" "ERROR"
         }
     }
 
@@ -250,7 +250,7 @@ $btnSetPriorities.Add_Click({
     if ($parentInterner) {
         $newPrio = $highestPrio + 1
         Set-Label -Identity $parentInterner.Identity -Priority $newPrio
-        Log "✅ Parentlabel '$($parentInterner.Name)' auf neue Priorität $newPrio gesetzt." "SUCCESS"
+        Write-Log "✅ Parentlabel '$($parentInterner.Name)' auf neue Priorität $newPrio gesetzt." "SUCCESS"
         Start-Sleep -Seconds 10
     }
 
@@ -261,14 +261,14 @@ $btnSetPriorities.Add_Click({
     if ($parentVertraulich) {
         $newPrio = $highestPrio + 1
         Set-Label -Identity $parentVertraulich.Identity -Priority $newPrio
-        Log "✅ Parentlabel '$($parentVertraulich.Name)' auf neue Priorität $newPrio gesetzt." "SUCCESS"
+        Write-Log "✅ Parentlabel '$($parentVertraulich.Name)' auf neue Priorität $newPrio gesetzt." "SUCCESS"
         Start-Sleep -Seconds 10
     }
 
     [System.Windows.MessageBox]::Show("✅ Alle Prioritäten (inkl. finaler Labels) wurden erfolgreich zugewiesen!", "Erfolg", "OK", "Info")
-    Log "✅ Kompletter Prioritätenprozess abgeschlossen!" "SUCCESS"
+    Write-Log "✅ Kompletter Prioritätenprozess abgeschlossen!" "SUCCESS"
 })
 
 $btnClose.Add_Click({ $window.Close() })
 $window.ShowDialog() | Out-Null
-Log "⚡ Script wurde beendet." "INFO"
+Write-Log "⚡ Script wurde beendet." "INFO"

@@ -22,7 +22,7 @@ param(
 )
 
 # === Modulprüfung und Import ===
-function Ensure-Module {
+function Install-RequiredModule {
     param([string]$ModuleName)
     if (-not (Get-Module -ListAvailable -Name $ModuleName)) {
         Write-Host "📦 Modul '$ModuleName' wird installiert..." -ForegroundColor Yellow
@@ -30,8 +30,8 @@ function Ensure-Module {
     }
     Import-Module $ModuleName
 }
-Ensure-Module -ModuleName "ExchangeOnlineManagement"
-Ensure-Module -ModuleName "ImportExcel"
+Install-RequiredModule -ModuleName "ExchangeOnlineManagement"
+Install-RequiredModule -ModuleName "ImportExcel"
 
 # === Verzeichnis-Handling für Logs und Exporte ===
 $DatumHeute = Get-Date -Format 'yyyyMMdd_HHmmss'
@@ -46,7 +46,7 @@ $LogFile = Join-Path $LogFolder "PurviewLabelProvisioning_LOG_$DatumJetzt.log"
 
 
 # === Logging + Fehler-Handling ===
-function Log {
+function Write-Log {
     param([string]$Message, [string]$Level = "INFO")
     $timestamp = Get-Date -Format 'yyyy-MM-dd HH:mm:ss'
     $prefix = switch ($Level) {
@@ -60,7 +60,7 @@ function Log {
     Add-Content -Path $LogFile -Value $entry -Encoding utf8
     Write-Host $entry -Encoding utf8
 }
-function Handle-Error {
+function Write-LogError {
     param([string]$Message, [object]$ErrorObject)
     $msg = if ($ErrorObject -is [System.Management.Automation.ErrorRecord]) { $ErrorObject.Exception.Message } else { $ErrorObject.ToString() }
     $fullMsg = "${Message}: $msg"
@@ -72,9 +72,9 @@ function Handle-Error {
 if (-not $UserPrincipalName) { $UserPrincipalName = Read-Host "🔑 Bitte geben Sie den UserPrincipalName ein" }
 try {
     Connect-IPPSSession -UserPrincipalName $UserPrincipalName
-    Log "✅ IPPS verbunden" "SUCCESS"
+    Write-Log "✅ IPPS verbunden" "SUCCESS"
 } catch {
-    Handle-Error "❌ IPPS Verbindung fehlgeschlagen" $_
+    Write-LogError "❌ IPPS Verbindung fehlgeschlagen" $_
 }
 
 # === Logos vorbereiten ===
@@ -91,7 +91,7 @@ function Create-ImageFromBase64 {
         $ms = New-Object IO.MemoryStream (,[byte[]]$bytes)
         return [System.Drawing.Image]::FromStream($ms)
     } catch {
-        Log "❌ Fehler beim Konvertieren von Base64-Logo: $_" "ERROR"
+        Write-Log "❌ Fehler beim Konvertieren von Base64-Logo: $_" "ERROR"
         return $null
     }
 }
@@ -114,11 +114,11 @@ function Check-Labels-Existence {
         if ($LabelOnline) {
             $label | Add-Member -NotePropertyName StatusColor -NotePropertyValue "LightGreen" -Force
             $label | Add-Member -NotePropertyName StatusText  -NotePropertyValue "Vorhanden" -Force
-            Log "Label '$LabelName' existiert bereits." "SUCCESS"
+            Write-Log "Label '$LabelName' existiert bereits." "SUCCESS"
         } else {
             $label | Add-Member -NotePropertyName StatusColor -NotePropertyValue "Salmon" -Force
             $label | Add-Member -NotePropertyName StatusText  -NotePropertyValue "Fehlt" -Force
-            Log "Label '$LabelName' fehlt." "INFO"
+            Write-Log "Label '$LabelName' fehlt." "INFO"
         }
     }
 }
@@ -167,13 +167,13 @@ function Create-Missing-Labels {
                 try {
                     $validDisplayName = Get-ValidDisplayName $label.DisplayName
                     New-Label -Name $label.Name -DisplayName $validDisplayName -Tooltip (Get-Tooltip $label)
-                    Log "✅ Parent-Label '$LabelName' erstellt." "SUCCESS"
+                    Write-Log "✅ Parent-Label '$LabelName' erstellt." "SUCCESS"
                     $label | Add-Member -NotePropertyName StatusColor -NotePropertyValue "LightGreen" -Force
                     $label | Add-Member -NotePropertyName StatusText  -NotePropertyValue "Vorhanden" -Force
                     $label.DisplayName = $validDisplayName
                     $created++
                 } catch {
-                    Log "❌ Fehler beim Erstellen von Parent-Label '$LabelName': $($_.Exception.Message)" "ERROR"
+                    Write-Log "❌ Fehler beim Erstellen von Parent-Label '$LabelName': $($_.Exception.Message)" "ERROR"
                 }
             }
         }
@@ -192,16 +192,16 @@ function Create-Missing-Labels {
                     try {
                         $validDisplayName = Get-ValidDisplayName $label.DisplayName
                         New-Label -Name $label.Name -DisplayName $validDisplayName -Tooltip (Get-Tooltip $label) -ParentId $ParentId
-                        Log "✅ Child-Label '$LabelName' erstellt (ParentId: $ParentId)." "SUCCESS"
+                        Write-Log "✅ Child-Label '$LabelName' erstellt (ParentId: $ParentId)." "SUCCESS"
                         $label | Add-Member -NotePropertyName StatusColor -NotePropertyValue "LightGreen" -Force
                         $label | Add-Member -NotePropertyName StatusText  -NotePropertyValue "Vorhanden" -Force
                         $label.DisplayName = $validDisplayName
                         $created++
                     } catch {
-                        Log "❌ Fehler beim Erstellen von Child-Label '$LabelName': $($_.Exception.Message)" "ERROR"
+                        Write-Log "❌ Fehler beim Erstellen von Child-Label '$LabelName': $($_.Exception.Message)" "ERROR"
                     }
                 } else {
-                    Log "❌ Parent-Label '$ParentName' nicht gefunden für Child-Label '$LabelName'." "ERROR"
+                    Write-Log "❌ Parent-Label '$ParentName' nicht gefunden für Child-Label '$LabelName'." "ERROR"
                 }
             }
         }
@@ -252,7 +252,7 @@ function Start-LabelUpdate {
         }
 
         if ($Languages.Count -eq 0) {
-            Log "❌ Keine gültigen Übersetzungen für Label '$LabelName'. Überspringe..." "ERROR"
+            Write-Log "❌ Keine gültigen Übersetzungen für Label '$LabelName'. Überspringe..." "ERROR"
             continue
         }
 
@@ -270,9 +270,9 @@ function Start-LabelUpdate {
                     (ConvertTo-Json $DisplayNameLocaleSettings -Depth 4 -Compress),
                     (ConvertTo-Json $TooltipLocaleSettings -Depth 4 -Compress)
                 )
-            Log "✅ Label '$LabelName' Sprachen aktualisiert." "SUCCESS"
+            Write-Log "✅ Label '$LabelName' Sprachen aktualisiert." "SUCCESS"
         } catch {
-            Log "❌ Fehler beim Update '$LabelName': $($_.Exception.Message)" "ERROR"
+            Write-Log "❌ Fehler beim Update '$LabelName': $($_.Exception.Message)" "ERROR"
         }
         Start-Sleep -s 2
     }
@@ -284,11 +284,11 @@ function Start-LabelUpdate {
     $global:ExcelData | ConvertTo-Json -Depth 5 | Out-File -FilePath $exportJson -Encoding utf8
 
     if ($labelsWithMissingTranslations.Count -gt 0) {
-        Log "✅ Übersetzungen ergänzt & exportiert: CSV=$exportCsv, JSON=$exportJson" "SUCCESS"
-        Log "ℹ️ Labels mit fehlenden Übersetzungen (vorher): $($labelsWithMissingTranslations -join ', ')" "INFO"
+        Write-Log "✅ Übersetzungen ergänzt & exportiert: CSV=$exportCsv, JSON=$exportJson" "SUCCESS"
+        Write-Log "ℹ️ Labels mit fehlenden Übersetzungen (vorher): $($labelsWithMissingTranslations -join ', ')" "INFO"
         [System.Windows.MessageBox]::Show("⚠️ Einige Labels hatten fehlende Übersetzungen und wurden ergänzt!\n\nDateien:\n- $exportCsv\n- $exportJson", "Übersetzungen ergänzt", "OK", "Warning")
     } else {
-        Log "✅ Keine fehlenden Übersetzungen – alles aktuell." "SUCCESS"
+        Write-Log "✅ Keine fehlenden Übersetzungen – alles aktuell." "SUCCESS"
         [System.Windows.MessageBox]::Show("✅ Keine fehlenden Übersetzungen – alles aktuell.", "Info", "OK", "Info")
     }
 }
@@ -301,7 +301,7 @@ function Load-LabelData-FromDeepLJson ($jsonFile) {
         if ($jsonRaw -and $jsonRaw.Trim().Length -gt 0) {
             $jsonData = $jsonRaw | ConvertFrom-Json
             if ($null -eq $jsonData -or $jsonData.Count -eq 0) {
-                Log "❌ DeepL JSON-Datei leer oder fehlerhaft!" "ERROR"
+                Write-Log "❌ DeepL JSON-Datei leer oder fehlerhaft!" "ERROR"
                 [System.Windows.MessageBox]::Show("❌ DeepL JSON-Datei leer oder fehlerhaft!", "Fehler", "OK", "Error")
                 return $false
             }
@@ -343,15 +343,15 @@ function Load-LabelData-FromDeepLJson ($jsonFile) {
             Check-Labels-Existence -LabelData $global:ExcelData
             $dgLabelData.ItemsSource = $null
             $dgLabelData.ItemsSource = $global:ExcelData
-            Log "📂 DeepL JSON geladen und gemappt: $jsonFile" "INFO"
+            Write-Log "📂 DeepL JSON geladen und gemappt: $jsonFile" "INFO"
             return $true
         } else {
-            Log "❌ DeepL JSON-Datei leer oder fehlerhaft!" "ERROR"
+            Write-Log "❌ DeepL JSON-Datei leer oder fehlerhaft!" "ERROR"
             [System.Windows.MessageBox]::Show("❌ DeepL JSON-Datei leer oder fehlerhaft!", "Fehler", "OK", "Error")
             return $false
         }
     } catch {
-        Log "❌ Fehler beim Einlesen der DeepL-JSON-Datei: $($_.Exception.Message)" "ERROR"
+        Write-Log "❌ Fehler beim Einlesen der DeepL-JSON-Datei: $($_.Exception.Message)" "ERROR"
         [System.Windows.MessageBox]::Show("❌ Fehler beim Einlesen der DeepL-JSON-Datei!", "Fehler", "OK", "Error")
         return $false
     }
@@ -464,11 +464,11 @@ function Load-LabelData-FromJson ($jsonFile) {
         if ($jsonRaw -and $jsonRaw.Trim().Length -gt 0) {
             $jsonData = $jsonRaw | ConvertFrom-Json
             if ($null -eq $jsonData) {
-                Log "❌ JSON konnte nicht konvertiert werden (null)" "ERROR"
+                Write-Log "❌ JSON konnte nicht konvertiert werden (null)" "ERROR"
                 [System.Windows.MessageBox]::Show("❌ JSON konnte nicht konvertiert werden!", "Fehler", "OK", "Error")
                 return $false
             } elseif ($jsonData.Count -eq 0) {
-                Log "❌ JSON-Datei ist leer oder enthält keine Labels" "ERROR"
+                Write-Log "❌ JSON-Datei ist leer oder enthält keine Labels" "ERROR"
                 [System.Windows.MessageBox]::Show("❌ JSON-Datei ist leer oder enthält keine Labels!", "Fehler", "OK", "Error")
                 return $false
             } else {
@@ -489,16 +489,16 @@ function Load-LabelData-FromJson ($jsonFile) {
                 Check-Labels-Existence -LabelData $global:ExcelData
                 $dgLabelData.ItemsSource = $null
                 $dgLabelData.ItemsSource = $global:ExcelData
-                Log "📂 JSON geladen: $jsonFile" "INFO"
+                Write-Log "📂 JSON geladen: $jsonFile" "INFO"
                 return $true
             }
         } else {
-            Log "❌ JSON-Datei leer oder fehlerhaft!" "ERROR"
+            Write-Log "❌ JSON-Datei leer oder fehlerhaft!" "ERROR"
             [System.Windows.MessageBox]::Show("❌ JSON-Datei leer oder fehlerhaft!", "Fehler", "OK", "Error")
             return $false
         }
     } catch {
-        Log "❌ Fehler beim Einlesen der JSON-Datei: $($_.Exception.Message)" "ERROR"
+        Write-Log "❌ Fehler beim Einlesen der JSON-Datei: $($_.Exception.Message)" "ERROR"
         [System.Windows.MessageBox]::Show("❌ Fehler beim Einlesen der JSON-Datei!", "Fehler", "OK", "Error")
         return $false
     }
@@ -578,9 +578,9 @@ $btnLoadExcel.Add_Click({
             Check-Labels-Existence -LabelData $global:ExcelData
             $dgLabelData.ItemsSource = $null
             $dgLabelData.ItemsSource = $global:ExcelData
-            Log "📂 Excel geladen: $($ofd.FileName)" "INFO"
+            Write-Log "📂 Excel geladen: $($ofd.FileName)" "INFO"
         } catch {
-            Log "❌ Fehler beim Excel-Import: $($_.Exception.Message)" "ERROR"
+            Write-Log "❌ Fehler beim Excel-Import: $($_.Exception.Message)" "ERROR"
             [System.Windows.MessageBox]::Show("❌ Fehler beim Excel-Import!", "Fehler", "OK", "Error")
         }
     }
@@ -621,4 +621,4 @@ $lastJson = Get-LastExportJson
 if ($lastJson) { Load-LabelData-FromJson $lastJson | Out-Null }
 
 $window.ShowDialog() | Out-Null
-Log "⚡ Script wurde beendet." "INFO"
+Write-Log "⚡ Script wurde beendet." "INFO"

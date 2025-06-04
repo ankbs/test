@@ -93,7 +93,7 @@ $DatumJetzt = Get-Date -Format 'yyyyMMdd_HHmmss'
 $DeepLLog   = Join-Path $LogFolder   "deepl_api_traffic_$DatumJetzt.log"
 
 # ======= Logging + Error-Handling =======
-function Log-DeepLRequest {
+function Write-Log-DeepLRequest {
     param(
         [string]$Stage,
         [string]$Lang,
@@ -206,7 +206,7 @@ function Translate-DeepL {
 $utf8NoBom = New-Object System.Text.UTF8Encoding($False)
 
 # === Modulprüfung und Import ===
-function Ensure-Module {
+function Install-RequiredModule {
     param([string]$ModuleName)
     if (-not (Get-Module -ListAvailable -Name $ModuleName)) {
         Write-Host "📦 Modul '$ModuleName' nicht gefunden – versuche Installation..." -ForegroundColor Yellow
@@ -225,7 +225,7 @@ function Ensure-Module {
         Write-Host "✅ Modul '$ModuleName' ist bereits installiert." -ForegroundColor Green
     }
 }
-Ensure-Module -ModuleName "ImportExcel"
+Install-RequiredModule -ModuleName "ImportExcel"
 Import-Module ImportExcel -Force
 
 # ======= Excel Datei bestimmen und einlesen (lokal/URL/Dialog) =======

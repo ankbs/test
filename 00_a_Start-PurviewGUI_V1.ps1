@@ -34,7 +34,7 @@ if (!(Test-Path $LogFolder)) { New-Item -ItemType Directory -Path $LogFolder -Fo
 $DatumJetzt = Get-Date -Format 'yyyyMMdd_HHmmss'
 $LogFile = Join-Path $LogFolder "StartGUI_$DatumJetzt.log"
 $GuiConfigPath = Join-Path $PSScriptRoot "GUIConfig.json"
-function Log {
+function Write-Log {
     param([string]$Message, [string]$Level = "INFO")
     $timestamp = Get-Date -Format 'yyyy-MM-dd HH:mm:ss'
     $prefix = switch ($Level) {
@@ -57,9 +57,9 @@ if (Test-Path $GuiConfigPath) {
         if ($cfg.MailToPrimary)     { $MailToPrimary     = $cfg.MailToPrimary }
         if ($cfg.MailToSecondary)   { $MailToSecondary   = $cfg.MailToSecondary }
         if ($cfg.LogFolder)         { $LogFolder         = $cfg.LogFolder }
-        Log "📥 Konfiguration aus $GuiConfigPath geladen." "INFO"
+        Write-Log "📥 Konfiguration aus $GuiConfigPath geladen." "INFO"
     } catch {
-        Log "⚠️ Fehler beim Laden der Konfiguration: $_" "ERROR"
+        Write-Log "⚠️ Fehler beim Laden der Konfiguration: $_" "ERROR"
     }
 }
 
@@ -209,7 +209,7 @@ function Set-Image ($ctrl, $base64) {
             $img.StreamSource = $stream
             $img.EndInit()
             $ctrl.Source = $img
-        } catch { Log "❌ Logo-Fehler: $_" "ERROR" }
+        } catch { Write-Log "❌ Logo-Fehler: $_" "ERROR" }
     }
 }
 Set-Image ($window.FindName("imgCompanyLogo")) $CompanyLogoBase64
@@ -220,7 +220,7 @@ $window.FindName("btnBrowse").Add_Click({
     $dialog = New-Object System.Windows.Forms.FolderBrowserDialog
     if ($dialog.ShowDialog() -eq 'OK') { $window.FindName("txtLogFolder").Text = $dialog.SelectedPath }
 })
-$window.FindName("btnCancel").Add_Click({ Log "Abgebrochen." "INFO"; $window.Close(); exit 1 })
+$window.FindName("btnCancel").Add_Click({ Write-Log "Abgebrochen." "INFO"; $window.Close(); exit 1 })
 $window.FindName("btnStart").Add_Click({
     $script:Result = @{
         UserPrincipalName = $window.FindName("txtUPN").Text
@@ -233,12 +233,12 @@ $window.FindName("btnStart").Add_Click({
                              else { "Sortieren" }
     }
     $script:Result | ConvertTo-Json -Depth 2 | Set-Content -Path $GuiConfigPath -Encoding UTF8
-    Log "✅ Konfiguration gespeichert: $GuiConfigPath" "SUCCESS"
+    Write-Log "✅ Konfiguration gespeichert: $GuiConfigPath" "SUCCESS"
     $window.Close()
 })
 
 $window.ShowDialog() | Out-Null
-if (-not $script:Result) { Log "Abbruch durch Benutzer." "ERROR"; exit 1 }
+if (-not $script:Result) { Write-Log "Abbruch durch Benutzer." "ERROR"; exit 1 }
 
 # Hauptskript
 $mainScript = switch ($script:Result.Aktion) {
@@ -251,4 +251,4 @@ if (-not (Test-Path $mainScript)) { Write-Error "Hauptskript fehlt: $mainScript"
 
 $arguments = @("-ExecutionPolicy Bypass", "-STA", "-File `"$mainScript`"", "-GuiConfigPath `"$GuiConfigPath`"") -join " "
 Start-Process powershell.exe -ArgumentList $arguments -WindowStyle Normal
-Log "✅ Hauptskript gestartet: $mainScript" "SUCCESS"
+Write-Log "✅ Hauptskript gestartet: $mainScript" "SUCCESS"
