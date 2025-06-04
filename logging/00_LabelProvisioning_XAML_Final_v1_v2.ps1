@@ -98,7 +98,7 @@ try {
         $worksheet = $workbook.Worksheets.Item(1)
         Write-Log -Message "Excel erfolgreich geladen." -Level "SUCCESS"
     } catch {
-        Handle-Error -Message "Fehler beim Laden der Excel-Datei" -ErrorObject $_
+        Write-LogError -Message "Fehler beim Laden der Excel-Datei" -ErrorObject $_
     }
 
     # Labels aus Excel auslesen (angenommen: Spalten A = LabelName, B = Beschreibung)
@@ -123,7 +123,7 @@ try {
             Start-Sleep -Milliseconds 100
             Write-Log -Message ("Label '{0}' erfolgreich provisioniert." -f $label.Name) -Level "SUCCESS"
         } catch {
-            Handle-Error -Message ("Fehler beim Provisionieren von Label {0}" -f $label.Name) -ErrorObject $_
+            Write-LogError -Message ("Fehler beim Provisionieren von Label {0}" -f $label.Name) -ErrorObject $_
         }
     }
 
@@ -140,5 +140,5 @@ try {
     Write-Host "Alle Labels wurden verarbeitet. Details siehe Log unter $LogFolder"
 }
 catch {
-    Handle-Error -Message "Fehler im Hauptskript" -ErrorObject $_
+    Write-LogError -Message "Fehler im Hauptskript" -ErrorObject $_
 }

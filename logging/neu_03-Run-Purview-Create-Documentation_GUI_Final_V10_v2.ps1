@@ -144,7 +144,7 @@ try {
             [System.Runtime.Interopservices.Marshal]::ReleaseComObject($workbook) | Out-Null
             [System.Runtime.Interopservices.Marshal]::ReleaseComObject($excel) | Out-Null
         } catch {
-            Handle-Error -Message "Fehler beim Laden der Excel-Datei" -ErrorObject $_
+            Write-LogError -Message "Fehler beim Laden der Excel-Datei" -ErrorObject $_
         }
     } else {
         Write-Log -Message "Keine Quelldatei für Labels angegeben oder Datei existiert nicht." -Level "ERROR"
@@ -167,7 +167,7 @@ try {
                 Write-Log -Message "PDF-Dokument erstellt: $pdfPath" -Level "SUCCESS"
             }
         } catch {
-            Handle-Error -Message "Fehler beim Dokumentationsexport" -ErrorObject $_
+            Write-LogError -Message "Fehler beim Dokumentationsexport" -ErrorObject $_
         }
     }
 
@@ -180,7 +180,7 @@ try {
             Start-Sleep -Seconds 1
             Write-Log -Message "Bericht erfolgreich versendet." -Level "SUCCESS"
         } catch {
-            Handle-Error -Message "Fehler beim Versand des Berichts" -ErrorObject $_
+            Write-LogError -Message "Fehler beim Versand des Berichts" -ErrorObject $_
         }
     }
 
@@ -189,5 +189,5 @@ try {
     Write-Host "Label-Dokumentation abgeschlossen. Siehe Log unter $LogFolder"
 }
 catch {
-    Handle-Error -Message "Fehler im Hauptskript" -ErrorObject $_
+    Write-LogError -Message "Fehler im Hauptskript" -ErrorObject $_
 }

@@ -98,7 +98,7 @@ try {
         $worksheet = $workbook.Worksheets.Item(1)
         Write-Log -Message "Excel erfolgreich geladen." -Level "SUCCESS"
     } catch {
-        Handle-Error -Message "Fehler beim Laden der Prioritäten-Excel-Datei" -ErrorObject $_
+        Write-LogError -Message "Fehler beim Laden der Prioritäten-Excel-Datei" -ErrorObject $_
     }
 
     # Lese Labels und Prioritäten (angenommen: Spalten A = LabelName, B = Priorität)
@@ -122,7 +122,7 @@ try {
             Write-Log -Message ("Label '{0}' hat Priorität {1}." -f $label.Name, $label.Priority) -Level "INFO"
             # Hier würde ggf. eine Aktualisierung in einem Zielsystem erfolgen
         } catch {
-            Handle-Error -Message ("Fehler bei Priorität Label {0}" -f $label.Name) -ErrorObject $_
+            Write-LogError -Message ("Fehler bei Priorität Label {0}" -f $label.Name) -ErrorObject $_
         }
     }
 
@@ -138,5 +138,5 @@ try {
     Write-Host "Alle Labels wurden nach Priorität verarbeitet. Details siehe Log unter $LogFolder"
 }
 catch {
-    Handle-Error -Message "Fehler im Hauptskript" -ErrorObject $_
+    Write-LogError -Message "Fehler im Hauptskript" -ErrorObject $_
 }

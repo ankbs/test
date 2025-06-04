@@ -278,5 +278,5 @@ try {
     Write-Log "✅ Hauptskript gestartet: $mainScript" "SUCCESS"
 }
 catch {
-    Handle-Error -Message "Fehler im Start-GUI Skript" -ErrorObject $_
+    Write-LogError -Message "Fehler im Start-GUI Skript" -ErrorObject $_
 }

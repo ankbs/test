@@ -15,7 +15,15 @@
         default   { "🔹" }
     }
     $entry = "$timestamp $prefix $Message"
-    Add-Content -Path $LogFile -Value $entry -Encoding utf8
+    try {
+        if ($LogFile) {
+            Add-Content -Path $LogFile -Value $entry -Encoding utf8
+        } else {
+            Write-Host "WARNUNG: Kein LogFile gesetzt!" -ForegroundColor Yellow
+        }
+    } catch {
+        Write-Host "FEHLER beim Schreiben ins Logfile: $entry" -ForegroundColor Red
+    }
     Write-Host $entry -Encoding utf8
 }
 
@@ -34,6 +42,10 @@ function Write-LogError {
     )
     $msg = if ($ErrorObject -is [System.Management.Automation.ErrorRecord]) { $ErrorObject.Exception.Message } else { $ErrorObject.ToString() }
     $fullMsg = "${Message}: $msg"
-    Write-Log -Message $fullMsg -Level "ERROR"
+    try {
+        Write-Log -Message $fullMsg -Level "ERROR"
+    } catch {
+        Write-Host "FEHLER beim Logging (Write-LogError): $fullMsg" -ForegroundColor Red
+    }
     throw $fullMsg
 }

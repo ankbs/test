@@ -97,7 +97,7 @@ try {
         $worksheet = $workbook.Worksheets.Item(1)
         Write-Log -Message "Excel erfolgreich geladen." -Level "SUCCESS"
     } catch {
-        Handle-Error -Message "Fehler beim Laden der Excel-Konfigurationsdatei" -ErrorObject $_
+        Write-LogError -Message "Fehler beim Laden der Excel-Konfigurationsdatei" -ErrorObject $_
     }
 
     # Labels und Sprachen auslesen (angenommen: Spalten A = LabelName, B = Sprache, C = Wert)
@@ -131,7 +131,7 @@ try {
                 Write-Log -Message ("Konfiguration vorhanden: {0} ({1})" -f $entry.Label, $entry.Language) -Level "SUCCESS"
             }
         } catch {
-            Handle-Error -Message ("Fehler bei der Prüfung von Label {0}, Sprache {1}" -f $entry.Label, $entry.Language) -ErrorObject $_
+            Write-LogError -Message ("Fehler bei der Prüfung von Label {0}, Sprache {1}" -f $entry.Label, $entry.Language) -ErrorObject $_
         }
     }
 
@@ -155,5 +155,5 @@ try {
     Write-Host "Alle Konfigurationen wurden geprüft. Details siehe Log unter $LogFolder"
 }
 catch {
-    Handle-Error -Message "Fehler im Hauptskript" -ErrorObject $_
+    Write-LogError -Message "Fehler im Hauptskript" -ErrorObject $_
 }
