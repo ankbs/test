@@ -1,4 +1,54 @@
-﻿param (
+﻿<#
+.SYNOPSIS
+    Prüfung und Erstellung fehlender Label-Sprach-Konfigurationen aus Excel für Microsoft Purview.
+
+.DESCRIPTION
+    Dieses Skript prüft auf Basis einer Excel-Konfigurationsdatei, ob für alle in der Datei gelisteten Sensitivitätslabels auch die notwendigen Sprachkonfigurationen existieren.
+    Die Excel-Datei muss eine strukturierte Tabelle enthalten, in der für jedes Label und jede Sprache der gewünschte Wert hinterlegt ist.
+    Für jede Kombination aus Label und Sprache wird geprüft, ob die Konfiguration vorhanden ist oder fehlt.
+    Fehlende Konfigurationen werden erkannt, geloggt und können nachträglich automatisiert provisioniert werden.
+    Sämtliche Vorgänge werden zentral über das Logging-Modul dokumentiert. Auch Fehler (z.B. fehlende Werte, fehlerhafte Excel-Datei, unerwartete Laufzeitfehler) werden sauber behandelt und im Log nachvollziehbar festgehalten.
+    Das Skript ist ideal für mehrsprachige Purview-Setups und erleichtert die Kontrolle und Nachpflege von Sprachvarianten für Sensitivitätslabels.
+    Nach Abschluss erfolgt ein übersichtlicher Statusbericht.
+    Dieses Skript liest seine Startparameter standardmäßig aus der PurviewConfig.json im gleichen Verzeichnis wie das Skript.
+    Alternativ kann eine eigene Konfigurationsdatei mit -ConfigPath übergeben werden oder alle Parameter wie gewohnt direkt per Skriptaufruf.
+
+
+.EXAMPLE
+    .\02-Run-PurviewLabelProvisioning_Create_Missing_Config_Only_Language_Final_V1_v2.ps1 -ConfigExcelPath ".\LabelConfig.xlsx"
+
+.EXAMPLE
+    .\02-Run-PurviewLabelProvisioning_Create_Missing_Config_Only_Language_Final_V1_v2.ps1 -ConfigExcelPath "C:\Konfig.xlsx" -LogFolder "C:\Logs" -UserPrincipalName "admin@contoso.com"
+
+.EXAMPLE
+    .\02-Run-PurviewLabelProvisioning_Create_Missing_Config_Only_Language_Final_V1_v2.ps1
+    # Verwendet automatisch .\PurviewConfig.json, falls vorhanden
+
+.EXAMPLE
+    .\02-Run-PurviewLabelProvisioning_Create_Missing_Config_Only_Language_Final_V1_v2.ps1 -ConfigPath "D:\Konfig\MeineConfig.json"
+    # Verwendet die explizit angegebene Datei
+
+.EXAMPLE
+    .\02-Run-PurviewLabelProvisioning_Create_Missing_Config_Only_Language_Final_V1_v2.ps1 -UserPrincipalName "admin@contoso.com" -InputExcelPath "C:\Labels.xlsx"
+    # Nutzt nur die direkt gesetzten Parameter
+
+.LINK
+    https://learn.microsoft.com/de-de/purview/
+
+.AUTHOR
+    Michael Kirst-Neshva
+
+.EMAIL
+    michael_kirst@hotmail.com
+
+.VERSION
+    V2
+
+.CREATIONDATE
+    2025
+#>
+
+param (
     [string]$ConfigExcelPath = "",
     [string]$LogFolder = "C:\Temp\script\",
     [string]$UserPrincipalName = "",
@@ -6,8 +56,20 @@
     [string]$MailToPrimary = "",
     [string]$MailToSecondary = "",
     [string]$CompanyLogoBase64 = "",
-    [string]$ProductLogoBase64 = ""
+    [string]$ProductLogoBase64 = "",
+    [string]$ConfigPath = ""
 )
+
+# Zentrales Config-Modul importieren (Pfad ggf. anpassen)
+Import-Module "$PSScriptRoot\..\modules\Import-ConfigParameters.psm1" -Force
+
+# Standardmäßig nach PurviewConfig.json im Skriptverzeichnis suchen, falls -ConfigPath leer bleibt
+if (-not $ConfigPath) {
+    $ConfigPath = Join-Path $PSScriptRoot "PurviewConfig.json"
+}
+if (Test-Path $ConfigPath) {
+    Import-ConfigParameters -ConfigPath $ConfigPath -BoundParameters $PSBoundParameters
+}
 
 Import-Module "$PSScriptRoot\CentralLogging.psm1" -Force
 Set-LogFile -LogFolder "$LogFolder"

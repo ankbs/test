@@ -1,4 +1,55 @@
-﻿param (
+﻿<#
+.SYNOPSIS
+    Automatisierte Label-Provisionierung aus Excel für Microsoft Purview.
+
+.DESCRIPTION
+    Dieses Skript dient der automatisierten Bereitstellung von Sensitivitätslabels für Microsoft Purview auf Basis einer Excel-Datei.
+    Es liest eine strukturierte Excel-Liste (Labelname, Beschreibung) ein und verarbeitet jeden Eintrag.
+    Jeder Label-Datensatz wird geprüft und anschließend provisioniert, wobei der eigentliche Provisionierungsvorgang modular gehalten ist (z.B. zur Integration von API-Aufrufen).
+    Die gesamte Ablaufsteuerung, Logging und Fehlerbehandlung erfolgt zentral und standardisiert über das CentralLogging-Modul.
+    Es werden alle relevanten Aktionen (z.B. Excel-Laden, Label-Verarbeitung, Fehlerfälle, Abschluss) mitgeloggt, sodass eine lückenlose Nachvollziehbarkeit und Debugging-Möglichkeit gegeben ist.
+    Das Skript eignet sich sowohl zum initialen Label-Rollout als auch für wiederkehrende Aktualisierungen.
+    Die Excel-Einlesung ist flexibel gestaltet, sodass Anpassungen an andere Spaltenstrukturen leicht möglich sind.
+    Nach Abschluss werden alle Ressourcen sauber freigegeben.
+    Dieses Skript liest seine Startparameter standardmäßig aus der PurviewConfig.json im gleichen Verzeichnis wie das Skript.
+    Alternativ kann eine eigene Konfigurationsdatei mit -ConfigPath übergeben werden oder alle Parameter wie gewohnt direkt per Skriptaufruf.
+
+
+.EXAMPLE
+    .\00_LabelProvisioning_XAML_Final_v1_v2.ps1 -InputExcelPath "C:\Data\Labels.xlsx"
+
+.EXAMPLE
+    .\00_LabelProvisioning_XAML_Final_v1_v2.ps1 -InputExcelPath ".\labels.xlsx" -LogFolder "C:\Logs" -UserPrincipalName "admin@contoso.com"
+
+.EXAMPLE
+    .\00_LabelProvisioning_XAML_Final_v1_v2.ps1
+    # Verwendet automatisch .\PurviewConfig.json, falls vorhanden
+
+.EXAMPLE
+    .\00_LabelProvisioning_XAML_Final_v1_v2.ps1 -ConfigPath "D:\Konfig\MeineConfig.json"
+    # Verwendet die explizit angegebene Datei
+
+.EXAMPLE
+    .\00_LabelProvisioning_XAML_Final_v1_v2.ps1 -UserPrincipalName "admin@contoso.com" -InputExcelPath "C:\Labels.xlsx"
+    # Nutzt nur die direkt gesetzten Parameter
+
+.LINK
+    https://learn.microsoft.com/de-de/purview/
+
+.AUTHOR
+    Michael Kirst-Neshva
+
+.EMAIL
+    michael_kirst@hotmail.com
+
+.VERSION
+    V2
+
+.CREATIONDATE
+    2025
+#>
+
+param (
     [string]$InputExcelPath = "",
     [string]$LogFolder = "C:\Temp\script\",
     [string]$UserPrincipalName = "",
@@ -6,8 +57,20 @@
     [string]$MailToPrimary = "",
     [string]$MailToSecondary = "",
     [string]$CompanyLogoBase64 = "",
-    [string]$ProductLogoBase64 = ""
+    [string]$ProductLogoBase64 = "",
+    [string]$ConfigPath = ""
 )
+
+# Zentrales Config-Modul importieren (Pfad ggf. anpassen)
+Import-Module "$PSScriptRoot\..\modules\Import-ConfigParameters.psm1" -Force
+
+# Standardmäßig nach PurviewConfig.json im Skriptverzeichnis suchen, falls -ConfigPath leer bleibt
+if (-not $ConfigPath) {
+    $ConfigPath = Join-Path $PSScriptRoot "PurviewConfig.json"
+}
+if (Test-Path $ConfigPath) {
+    Import-ConfigParameters -ConfigPath $ConfigPath -BoundParameters $PSBoundParameters
+}
 
 Import-Module "$PSScriptRoot\CentralLogging.psm1" -Force
 Set-LogFile -LogFolder "$LogFolder"

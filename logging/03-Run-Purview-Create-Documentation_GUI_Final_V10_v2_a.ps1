@@ -53,7 +53,7 @@ param(
 )
 
 # === Zentrale Konfigurationslogik ===
-$importConfigModulePath = Join-Path $PSScriptRoot "\modules\Import-ConfigParameters.psm1"
+$importConfigModulePath = Join-Path $PSScriptRoot "..\modules\Import-ConfigParameters.psm1"
 if (Test-Path $importConfigModulePath) { Import-Module $importConfigModulePath -Force }
 
 if (-not $ConfigPath) {

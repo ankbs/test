@@ -1,4 +1,53 @@
-﻿param (
+﻿<#
+.SYNOPSIS
+    Verwaltung und Sortierung von Sensitivitätslabels nach Prioritäten für Microsoft Purview.
+
+.DESCRIPTION
+    Dieses Skript liest Label-Prioritäten aus einer Excel-Datei ein, sortiert die Sensitivitätslabels nach den definierten Prioritäten und bereitet die Daten für weitere Verarbeitungsschritte auf.
+    Es eignet sich zur automatisierten Anpassung und Steuerung der Reihenfolge von Labels in Microsoft Purview, zum Beispiel für konsistente Präsentation in Compliance-Prozessen oder für technische Automatisierungen.
+    Die Excel-Datei muss für jedes Label eine Prioritätszahl enthalten; die Labels werden entsprechend aufbereitet, sortiert und optional zur weiteren Nutzung exportiert.
+    Das Skript verwendet ein zentrales Logging- und Fehlerbehandlungssystem, um eine lückenlose Nachvollziehbarkeit zu gewährleisten.
+    Typische Fehlerfälle (fehlende Datei, inkorrekte Werte, Laufzeitfehler) werden abgefangen und dokumentiert.
+    Nach Abschluss steht eine sortierte Liste zur Verfügung, die für Importe, Reports oder weitere Automatisierung genutzt werden kann.
+    Dieses Skript liest seine Startparameter standardmäßig aus der PurviewConfig.json im gleichen Verzeichnis wie das Skript.
+    Alternativ kann eine eigene Konfigurationsdatei mit -ConfigPath übergeben werden oder alle Parameter wie gewohnt direkt per Skriptaufruf.
+
+
+.EXAMPLE
+    .\04-Run-Purview-Label-PriorityManager_V1_v2.ps1 -PriorityConfigExcel ".\Priorities.xlsx"
+
+.EXAMPLE
+    .\04-Run-Purview-Label-PriorityManager_V1_v2.ps1 -UserPrincipalName "user@domain.de" -PriorityConfigExcel "C:\Prioritäten.xlsx" -LogFolder "C:\Logs"
+
+.EXAMPLE
+    .\04-Run-Purview-Label-PriorityManager_V1_v2.ps1
+    # Verwendet automatisch .\PurviewConfig.json, falls vorhanden
+
+.EXAMPLE
+    .\04-Run-Purview-Label-PriorityManager_V1_v2.ps1 -ConfigPath "D:\Konfig\MeineConfig.json"
+    # Verwendet die explizit angegebene Datei
+
+.EXAMPLE
+    .\04-Run-Purview-Label-PriorityManager_V1_v2.ps1 -UserPrincipalName "admin@contoso.com" -InputExcelPath "C:\Labels.xlsx"
+    # Nutzt nur die direkt gesetzten Parameter
+
+.LINK
+    https://learn.microsoft.com/de-de/purview/
+
+.AUTHOR
+    Michael Kirst-Neshva
+
+.EMAIL
+    michael_kirst@hotmail.com
+
+.VERSION
+    V2
+
+.CREATIONDATE
+    2025
+#>
+
+param (
     [string]$UserPrincipalName = "",
     [string]$Tenantdomain = "",
     [string]$LogFolder = "C:\Temp\script\",
@@ -8,8 +57,20 @@
     [string]$MSPURL     = "",
     [string]$CompanyLogoBase64 = "",
     [string]$ProductLogoBase64 = "",
-    [string]$PriorityConfigExcel = ""
+    [string]$PriorityConfigExcel = "",
+    [string]$ConfigPath = ""
 )
+
+# Zentrales Config-Modul importieren (Pfad ggf. anpassen)
+Import-Module "$PSScriptRoot\modules\Import-ConfigParameters.psm1" -Force
+
+# Standardmäßig nach PurviewConfig.json im Skriptverzeichnis suchen, falls -ConfigPath leer bleibt
+if (-not $ConfigPath) {
+    $ConfigPath = Join-Path $PSScriptRoot "PurviewConfig.json"
+}
+if (Test-Path $ConfigPath) {
+    Import-ConfigParameters -ConfigPath $ConfigPath -BoundParameters $PSBoundParameters
+}
 
 Import-Module "$PSScriptRoot\CentralLogging.psm1" -Force
 Set-LogFile -LogFolder "$LogFolder"

@@ -1,4 +1,54 @@
-﻿
+﻿<#
+.SYNOPSIS
+    Start-GUI für Microsoft Purview Automatisierung mit zentraler Konfigurationsverwaltung.
+
+.DESCRIPTION
+    Dieses Skript stellt eine grafische Benutzeroberfläche (GUI) bereit, mit der zentrale Parameter für die nachfolgenden Purview-Automatisierungsskripte einfach und strukturiert eingegeben werden können.
+    Die GUI ermöglicht die komfortable Erfassung von Benutzerinformationen (z.B. UserPrincipalName, Tenantdomain), Mail-Empfängern, Log-Ordner, MSP-Partnerdaten sowie Firmen- und Produktlogos (inklusive Base64-Support).
+    Die erfassten Konfigurationsdaten werden validiert, in einer JSON-Konfigurationsdatei gespeichert und stehen damit für Folgeprozesse konsistent zur Verfügung.
+    Abhängig von der gewählten Aktion (z.B. Label-Report, Label-Bearbeitung, Label-Priorisierung) ruft das Skript automatisch das jeweils passende Folgeskript auf und übergibt die Konfigurationsparameter.
+    Die zentrale Logging- und Fehlerbehandlung sorgt für vollständige Nachvollziehbarkeit sämtlicher Abläufe und ermöglicht schnelle Fehlerdiagnosen.
+    Das Skript unterstützt sowohl Demo- als auch Produktivbetrieb und kann bei Bedarf durch Anpassungen der XAML-Struktur für neue Anforderungen erweitert werden.
+    Es ist der empfohlene Einstiegspunkt für die gesamte Purview-Automatisierungs-Suite.
+    Dieses Skript liest seine Startparameter standardmäßig aus der PurviewConfig.json im gleichen Verzeichnis wie das Skript.
+    Alternativ kann eine eigene Konfigurationsdatei mit -ConfigPath übergeben werden oder alle Parameter wie gewohnt direkt per Skriptaufruf.
+
+
+.EXAMPLE
+    .\00_a_Start-PurviewGUI_V1_v2.ps1
+
+.EXAMPLE
+    .\00_a_Start-PurviewGUI_V1_v2.ps1 -UserPrincipalName "admin@contoso.com" -LogFolder "C:\Logs"
+
+.EXAMPLE
+    .\00_a_Start-PurviewGUI_V1_v2.ps1
+    # Verwendet automatisch .\PurviewConfig.json, falls vorhanden
+
+.EXAMPLE
+    .\00_a_Start-PurviewGUI_V1_v2.ps1 -ConfigPath "D:\Konfig\MeineConfig.json"
+    # Verwendet die explizit angegebene Datei
+
+.EXAMPLE
+    .\00_a_Start-PurviewGUI_V1_v2.ps1 -UserPrincipalName "admin@contoso.com" -InputExcelPath "C:\Labels.xlsx"
+    # Nutzt nur die direkt gesetzten Parameter
+
+.LINK
+    https://learn.microsoft.com/de-de/purview/
+
+.AUTHOR
+    Michael Kirst-Neshva
+
+.EMAIL
+    michael_kirst@hotmail.com
+
+.VERSION
+    V2
+
+.CREATIONDATE
+    2025
+#>
+
+
 param (
     [string]$UserPrincipalName = "",
     [string]$Tenantdomain      = "",
@@ -17,8 +67,20 @@ param (
     [string]$MSPURL     = "",
     [string]$MSPNameEU  = "",
     [string]$CompanyLogoBase64 = "",
-    [string]$ProductLogoBase64 = ""
+    [string]$ProductLogoBase64 = "",
+    [string]$ConfigPath = ""
 )
+
+# Zentrales Config-Modul importieren (Pfad ggf. anpassen)
+Import-Module "$PSScriptRoot\modules\Import-ConfigParameters.psm1" -Force
+
+# Standardmäßig nach PurviewConfig.json im Skriptverzeichnis suchen, falls -ConfigPath leer bleibt
+if (-not $ConfigPath) {
+    $ConfigPath = Join-Path $PSScriptRoot "PurviewConfig.json"
+}
+if (Test-Path $ConfigPath) {
+    Import-ConfigParameters -ConfigPath $ConfigPath -BoundParameters $PSBoundParameters
+}
 
 Import-Module "$PSScriptRoot\CentralLogging.psm1" -Force
 Set-LogFile -LogFolder "$PSScriptRoot\Logs"
@@ -32,7 +94,7 @@ try {
     $LogFile = Join-Path $LogFolder "StartGUI_$DatumJetzt.log"
     $GuiConfigPath = Join-Path $PSScriptRoot "GUIConfig.json"
 
-    function Log {
+    function Write-Log {
         param([string]$Message, [string]$Level = "INFO")
         Write-Log -Message $Message -Level $Level -LogFile $LogFile
     }
@@ -46,9 +108,9 @@ try {
             if ($cfg.MailToPrimary)     { $MailToPrimary     = $cfg.MailToPrimary }
             if ($cfg.MailToSecondary)   { $MailToSecondary   = $cfg.MailToSecondary }
             if ($cfg.LogFolder)         { $LogFolder         = $cfg.LogFolder }
-            Log "📥 Konfiguration aus $GuiConfigPath geladen." "INFO"
+            Write-Log "📥 Konfiguration aus $GuiConfigPath geladen." "INFO"
         } catch {
-            Log "⚠️ Fehler beim Laden der Konfiguration: $_" "ERROR"
+            Write-Log "⚠️ Fehler beim Laden der Konfiguration: $_" "ERROR"
         }
     }
 
@@ -171,7 +233,7 @@ try {
                 $img.StreamSource = $stream
                 $img.EndInit()
                 $ctrl.Source = $img
-            } catch { Log "❌ Logo-Fehler: $_" "ERROR" }
+            } catch { Write-Log "❌ Logo-Fehler: $_" "ERROR" }
         }
     }
     Set-Image ($window.FindName("imgCompanyLogo")) $CompanyLogoBase64
@@ -182,7 +244,7 @@ try {
         $dialog = New-Object System.Windows.Forms.FolderBrowserDialog
         if ($dialog.ShowDialog() -eq 'OK') { $window.FindName("txtLogFolder").Text = $dialog.SelectedPath }
     })
-    $window.FindName("btnCancel").Add_Click({ Log "Abgebrochen." "INFO"; $window.Close(); exit 1 })
+    $window.FindName("btnCancel").Add_Click({ Write-Log "Abgebrochen." "INFO"; $window.Close(); exit 1 })
     $window.FindName("btnStart").Add_Click({
         $script:Result = @{
             UserPrincipalName = $window.FindName("txtUPN").Text
@@ -195,25 +257,25 @@ try {
                                  else { "Sortieren" }
         }
         $script:Result | ConvertTo-Json -Depth 2 | Set-Content -Path $GuiConfigPath -Encoding UTF8
-        Log "✅ Konfiguration gespeichert: $GuiConfigPath" "SUCCESS"
+        Write-Log "✅ Konfiguration gespeichert: $GuiConfigPath" "SUCCESS"
         $window.Close()
     })
 
     $window.ShowDialog() | Out-Null
-    if (-not $script:Result) { Log "Abbruch durch Benutzer." "ERROR"; exit 1 }
+    if (-not $script:Result) { Write-Log "Abbruch durch Benutzer." "ERROR"; exit 1 }
 
     # Hauptskript
-    $mainScript = switch ($script:Result.Aktion) {
-        "Report"     { ".\03-Run-Purview-Create-Documentation_GUI_Final_V10.ps1" }
-        "AddLanguage"{ ".\02-Run-PurviewLabelProvisioning_Create_Missing_Config_Only_Language_Final_V1.ps1" }
-        "Sortieren"  { ".\04-Run-Purview-Label-PriorityManager_V1.ps1" }
-        default      { Write-Log -Message "Keine gültige Aktion!" -Level "ERROR"; exit 1 }
-    }
+        $mainScript = switch ($script:Result.Aktion) {
+            "Report"     { ".\03-Run-Purview-Create-Documentation_GUI_Final_V10_v2.ps1" }
+            "AddLanguage"{ ".\02-Run-PurviewLabelProvisioning_Create_Missing_Config_Only_Language_Final_V1_v2.ps1" }
+            "Sortieren"  { ".\04-Run-Purview-Label-PriorityManager_V1_v2.ps1" }
+            default      { Write-Log -Message "Keine gültige Aktion!" -Level "ERROR"; exit 1 }
+        }
     if (-not (Test-Path $mainScript)) { Write-Log -Message "Hauptskript fehlt: $mainScript" -Level "ERROR"; exit 1 }
 
     $arguments = @("-ExecutionPolicy Bypass", "-STA", "-File `"$mainScript`"", "-GuiConfigPath `"$GuiConfigPath`"") -join " "
     Start-Process powershell.exe -ArgumentList $arguments -WindowStyle Normal
-    Log "✅ Hauptskript gestartet: $mainScript" "SUCCESS"
+    Write-Log "✅ Hauptskript gestartet: $mainScript" "SUCCESS"
 }
 catch {
     Handle-Error -Message "Fehler im Start-GUI Skript" -ErrorObject $_

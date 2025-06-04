@@ -27,7 +27,7 @@ function Set-LogFile {
     $script:CentralLogFile = Join-Path $LogFolder ("CentralLog_{0}.log" -f (Get-Date -Format 'yyyyMMdd_HHmmss'))
 }
 
-function Handle-Error {
+function Write-LogError {
     param(
         [string]$Message,
         [object]$ErrorObject
