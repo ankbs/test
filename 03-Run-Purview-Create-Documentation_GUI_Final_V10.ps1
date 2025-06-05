@@ -81,7 +81,7 @@ $StatusReportCsv = [System.IO.Path]::Combine($LogFolder, "Label_Status_$DatumJet
 # === Ende Zeitstempel / Logdateien ===
 
 # === Logging + Error-Handling ===
-function Write-Log {
+function Log {
     param(
         [string]$Message,
         [string]$Level = "INFO"
@@ -128,7 +128,7 @@ function Write-Log {
     Write-Host $logEntry -Encoding utf8
 }
 
-function Write-LogError {
+function Handle-Error {
     param (
         [string]$Message,
         [object]$ErrorObject
@@ -214,13 +214,13 @@ if (Test-Path $GuiConfigPath) {
         Set-IfNotEmpty -TargetVariableName "MSPMail"           -SourceValue $GuiConfig.MSPMail
         Set-IfNotEmpty -TargetVariableName "MSPURL"            -SourceValue $GuiConfig.MSPURL
 
-        Write-Log "✅ GUI-Konfiguration geladen aus $GuiConfigPath" "INFO"
+        Log "✅ GUI-Konfiguration geladen aus $GuiConfigPath" "INFO"
     } catch {
-        Write-Log "⚠️ Fehler beim Einlesen der GUI-Konfiguration, verwende Standardwerte. $_" "WARNING"
+        Log "⚠️ Fehler beim Einlesen der GUI-Konfiguration, verwende Standardwerte. $_" "WARNING"
         Set-DefaultGuiValues
     }
 } else {
-    Write-Log "ℹ️ Keine GUI-Konfiguration gefunden – Standardwerte werden verwendet." "INFO"
+    Log "ℹ️ Keine GUI-Konfiguration gefunden – Standardwerte werden verwendet." "INFO"
     Set-DefaultGuiValues
 }
 
@@ -228,18 +228,18 @@ if (Test-Path $GuiConfigPath) {
 # === Pflichtfeldprüfung Mail ===
     if (-not $MailToPrimary -or $MailToPrimary -eq "") {
     Write-Host "❌ Es wurde keine primäre E-Mail-Adresse für den Versand angegeben." -ForegroundColor Red
-    Write-Log "❌ Es wurde keine primäre E-Mail-Adresse für den Versand angegeben." "ERROR"
+    Log "❌ Es wurde keine primäre E-Mail-Adresse für den Versand angegeben." "ERROR"
     exit 1
 }
 
 # LogoGIFUrl aus Config laden, falls vorhanden
         if ($GuiConfig.LogoGIFUrl) {
             $LogoGIFUrl = $GuiConfig.LogoGIFUrl
-            Write-Log "⚙️ LogoGIFUrl aus Config geladen: $LogoGIFUrl" "INFO"
+            Log "⚙️ LogoGIFUrl aus Config geladen: $LogoGIFUrl" "INFO"
         }
 
 # Debug-Log, um den Wert zu prüfen
-        Write-Log "DEBUG: LogoGIFUrl (vor Prüfung): $LogoGIFUrl" "DEBUG"
+        Log "DEBUG: LogoGIFUrl (vor Prüfung): $LogoGIFUrl" "DEBUG"
 
 # $LogoGIFUrl    = "https://i.gifer.com/ZKZg.gif" # "", # "https://i.gifer.com/ZKZg.gif",  # animiertes Zahnrad
         
@@ -254,12 +254,12 @@ if (Test-Path $GuiConfigPath) {
         )
 
         $LogoGIFUrl = Get-Random -InputObject $StandardGIFs
-        Write-Log "🎞️ Animiertes GIF für Splash: $LogoGIFUrl" "INFO"
+        Log "🎞️ Animiertes GIF für Splash: $LogoGIFUrl" "INFO"
         Write-Host "🔄 Kein GIF übergeben – zufälliges Standard-GIF ausgewählt: $LogoGIFUrl" -ForegroundColor Cyan
     }
 
     if ($LogoUrl -and $LogoUrl.Trim() -ne "") {
-        Write-Log "🏷️ Produktlogo wird geladen: $LogoUrl" "DEBUG"
+        Log "🏷️ Produktlogo wird geladen: $LogoUrl" "DEBUG"
         }
 
 
@@ -291,22 +291,22 @@ $MSPURL     = "https://www.domaine.io"
 
 # === Modulprüfung ===
 
-function Install-RequiredModule {
+function Ensure-Module {
     param([string]$ModuleName)
     if (-not (Get-Module -ListAvailable -Name $ModuleName)) {
-        Write-Log "📦 Modul '$ModuleName' nicht gefunden – versuche Installation..." "INFO"
+        Log "📦 Modul '$ModuleName' nicht gefunden – versuche Installation..." "INFO"
         if (-not (Get-PSRepository -Name PSGallery -ErrorAction SilentlyContinue)) {
             Register-PSRepository -Default
         }
         [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
         try {
             Install-Module -Name $ModuleName -Scope CurrentUser -Force -AllowClobber
-            Write-Log "✅ Modul '$ModuleName' installiert." "SUCCESS"
+            Log "✅ Modul '$ModuleName' installiert." "SUCCESS"
         } catch {
-            Write-LogError "Modulinstallation fehlgeschlagen" $_
+            Handle-Error "Modulinstallation fehlgeschlagen" $_
         }
     } else {
-        Write-Log "✅ Modul '$ModuleName' ist bereits installiert." "DEBUG"
+        Log "✅ Modul '$ModuleName' ist bereits installiert." "DEBUG"
     }
 }
 
@@ -314,18 +314,18 @@ function Install-RequiredModule {
 
 # === Modulprüfung und Import ===
 
-Install-RequiredModule -ModuleName "ExchangeOnlineManagement"
+Ensure-Module -ModuleName "ExchangeOnlineManagement"
 Import-Module ExchangeOnlineManagement
-Install-RequiredModule -ModuleName "ImportExcel"
+Ensure-Module -ModuleName "ImportExcel"
 Import-Module ImportExcel
 
 # === Ende Modulprüfung und Import ===
 
 if ($DryRun) {
-    Write-Log "🧪 DryRun-Modus aktiviert – es werden keine Dateien gespeichert oder Mails gesendet." "WARNING"
+    Log "🧪 DryRun-Modus aktiviert – es werden keine Dateien gespeichert oder Mails gesendet." "WARNING"
 }
 
-# Write-Log "🐛 [DEBUG] Inhalt von Priorities: $Priorities" "DEBUG"
+# Log "🐛 [DEBUG] Inhalt von Priorities: $Priorities" "DEBUG"
 
 # =====================================================================##
 
@@ -337,7 +337,7 @@ function Import-LabelsFromExcel {
     )
 
     if (-not (Test-Path $FilePath)) {
-        Write-Log "❌ Excel-Datei nicht gefunden: $FilePath" "ERROR"
+        Log "❌ Excel-Datei nicht gefunden: $FilePath" "ERROR"
         return
     }
 
@@ -354,9 +354,9 @@ function Import-LabelsFromExcel {
             if ($labelName -and $labelName.Trim() -ne "") {
                 try {
                     $label = Get-Label -Identity $labelName.Trim()
-                    Write-Log "✅ Label gefunden: $($label.DisplayName)" "SUCCESS"
+                    Log "✅ Label gefunden: $($label.DisplayName)" "SUCCESS"
                 } catch {
-                    Write-Log "⚠️ Label nicht gefunden mit Display1: $labelName – versuche LabelNameOLD..." "WARNING"
+                    Log "⚠️ Label nicht gefunden mit Display1: $labelName – versuche LabelNameOLD..." "WARNING"
                 }
             }
 
@@ -364,10 +364,10 @@ function Import-LabelsFromExcel {
             if (-not $label -and $fallbackName -and $fallbackName.Trim() -ne "") {
                 try {
                     $label = Get-Label -Identity $fallbackName.Trim()
-                    Write-Log "✅ Fallback-Label gefunden: $($label.DisplayName)" "SUCCESS"
+                    Log "✅ Fallback-Label gefunden: $($label.DisplayName)" "SUCCESS"
                 } catch {
                     $notFound += "$labelName / $fallbackName"
-                    Write-Log "❌ Label nicht gefunden: $labelName (Fallback: $fallbackName)" "ERROR"
+                    Log "❌ Label nicht gefunden: $labelName (Fallback: $fallbackName)" "ERROR"
                 }
             }
 
@@ -379,16 +379,16 @@ function Import-LabelsFromExcel {
         if ($importedLabels.Count -gt 0) {
             $script:allLabels = $importedLabels
             Update-LabelList -source $script:allLabels
-            Write-Log "📥 $($importedLabels.Count) gültige Labels aus Excel übernommen." "INFO"
+            Log "📥 $($importedLabels.Count) gültige Labels aus Excel übernommen." "INFO"
         } else {
-            Write-Log "⚠️ Keine gültigen Labels aus Excel importiert." "WARNING"
+            Log "⚠️ Keine gültigen Labels aus Excel importiert." "WARNING"
         }
 
         if ($notFound.Count -gt 0) {
-            Write-Log "⚠️ Nicht gefundene Labels (Excel): $($notFound -join ', ')" "DEBUG"
+            Log "⚠️ Nicht gefundene Labels (Excel): $($notFound -join ', ')" "DEBUG"
         }
     } catch {
-        Write-LogError "Fehler beim Import oder Verarbeiten der Excel-Datei" $_
+        Handle-Error "Fehler beim Import oder Verarbeiten der Excel-Datei" $_
     }
 }
 
@@ -405,16 +405,16 @@ function Connect-MFASessions {
             $script:UserPrincipalName = Read-Host "🔑 Bitte geben Sie den UserPrincipalName für die Verbindung ein"
         }
 
-        Write-Log "🔐 Verbinde IPPS Session via MFA für UPN: $($script:UserPrincipalName)" "INFO"
+        Log "🔐 Verbinde IPPS Session via MFA für UPN: $($script:UserPrincipalName)" "INFO"
         Connect-IPPSSession -UserPrincipalName $script:UserPrincipalName
-        Write-Log "✅ IPPS verbunden" "SUCCESS"
+        Log "✅ IPPS verbunden" "SUCCESS"
     } catch {
-        Write-LogError "❌ IPPS Verbindung fehlgeschlagen" $_
+        Handle-Error "❌ IPPS Verbindung fehlgeschlagen" $_
     }
 
     # Cmdlet-Verfügbarkeit prüfen
     if (-not (Get-Command Get-Label -ErrorAction SilentlyContinue)) {
-        Write-LogError "❌ Cmdlet 'Get-Label' ist nicht verfügbar" ([System.Exception]::new("Get-Label fehlt"))
+        Handle-Error "❌ Cmdlet 'Get-Label' ist nicht verfügbar" ([System.Exception]::new("Get-Label fehlt"))
     }
 }
 
@@ -423,7 +423,7 @@ function Connect-MFASessions {
 # === SplashScreen ===
 
 # === Start SplashScreen ===
-function Start-SplashScreen {
+function Start-SplashInThread {
     param (
         [bool]$UseProgressBar = $false,
         [int]$AutoCloseAfterSeconds = 2,
@@ -607,7 +607,7 @@ function Start-SplashScreen {
 
 # === Stop SplashScreen ===
 
-function Stop-SplashScreen {
+function Stop-SplashThread {
     if ($global:SplashForm -and !$global:SplashForm.IsDisposed) {
         $global:SplashForm.Invoke({ $global:SplashForm.Close() })
     }
@@ -624,7 +624,7 @@ function Stop-SplashScreen {
 
 
 # === PRIORITÄTENPARSER ===
-function ConvertTo-PriorityList {
+function Parse-Priorities {
     param(
         [string]$Input,
         [int[]]$AvailablePriorities
@@ -639,15 +639,15 @@ function ConvertTo-PriorityList {
     $entries = $Input -split ','
 
     foreach ($entryRaw in $entries) {
-    Write-Log "🔍 Starte Prüfung von Eintrag: '$entryRaw'" "DEBUG"
+    Log "🔍 Starte Prüfung von Eintrag: '$entryRaw'" "DEBUG"
         $entry = $entryRaw.Trim()
 
         try {
             if ($entry -match '^\d+-\d+$') {
                 # Bereich z. B. 100-120
-                Write-Log "➕ Bereich erkannt: $start-$end" "DEBUG"
-                Write-Log "➕ Einzelwert erkannt: $val" "DEBUG"
-                Write-Log "➕ Bereich ab erkannt: $start → $($matched.Count) Treffer" "DEBUG"
+                Log "➕ Bereich erkannt: $start-$end" "DEBUG"
+                Log "➕ Einzelwert erkannt: $val" "DEBUG"
+                Log "➕ Bereich ab erkannt: $start → $($matched.Count) Treffer" "DEBUG"
                 $rangeParts = $entry -split '-'
                 $start = [int]$rangeParts[0]
                 $end   = [int]$rangeParts[1]
@@ -655,32 +655,32 @@ function ConvertTo-PriorityList {
                 if ($start -le $end) {
                     $result += $start..$end
                 } else {
-                    Write-Log "⚠️ Bereich ignoriert (Start > Ende): '$entry'" "WARNING"
+                    Log "⚠️ Bereich ignoriert (Start > Ende): '$entry'" "WARNING"
                 }
             }
             elseif ($entry -match '^\d+-$') {
                 # Bereich ab z. B. 150-
-                Write-Log "➕ Bereich erkannt: $start-$end" "DEBUG"
-                Write-Log "➕ Einzelwert erkannt: $val" "DEBUG"
-                Write-Log "➕ Bereich ab erkannt: $start → $($matched.Count) Treffer" "DEBUG"
+                Log "➕ Bereich erkannt: $start-$end" "DEBUG"
+                Log "➕ Einzelwert erkannt: $val" "DEBUG"
+                Log "➕ Bereich ab erkannt: $start → $($matched.Count) Treffer" "DEBUG"
                 $start = [int]($entry -replace '-$', '')
                 $matched = $AvailablePriorities | Where-Object { $_ -ge $start }
                 $result += $matched
             }
             elseif ($entry -match '^\d+$') {
                 # Einzelwert
-                Write-Log "➕ Bereich erkannt: $start-$end" "DEBUG"
-                Write-Log "➕ Einzelwert erkannt: $val" "DEBUG"
-                Write-Log "➕ Bereich ab erkannt: $start → $($matched.Count) Treffer" "DEBUG"
+                Log "➕ Bereich erkannt: $start-$end" "DEBUG"
+                Log "➕ Einzelwert erkannt: $val" "DEBUG"
+                Log "➕ Bereich ab erkannt: $start → $($matched.Count) Treffer" "DEBUG"
                 $val = [int]$entry
                 $result += $val
             }
             else {
-                Write-Log "⚠️ Ungültiger Prioritätseintrag ignoriert: '$entry'" "WARNING"
+                Log "⚠️ Ungültiger Prioritätseintrag ignoriert: '$entry'" "WARNING"
             }
         }
         catch {
-            Write-Log "⚠️ Fehler beim Parsen von Prioritätseintrag '$entry': $($_.Exception.Message)" "ERROR"
+            Log "⚠️ Fehler beim Parsen von Prioritätseintrag '$entry': $($_.Exception.Message)" "ERROR"
         }
     }
 
@@ -959,7 +959,7 @@ catch {
         if ($fileDialog.ShowDialog() -eq 'OK') {
             Import-LabelsFromExcel -FilePath $fileDialog.FileName
             Update-LabelList -source $script:allLabels
-            Write-Log "✅ Excel-Datei geladen: $($fileDialog.FileName)" "SUCCESS"
+            Log "✅ Excel-Datei geladen: $($fileDialog.FileName)" "SUCCESS"
         }
     })
 
@@ -1079,10 +1079,10 @@ $form.Add_FormClosing({
             try {
             if (Get-Module -Name ExchangeOnlineManagement -ListAvailable) {
                 Disconnect-ExchangeOnline -Confirm:$false -ErrorAction Stop
-                Write-Log "✅ Exchange Online Sitzung nach Abbruch durch Benutzer beendet." "INFO"
+                Log "✅ Exchange Online Sitzung nach Abbruch durch Benutzer beendet." "INFO"
             }
         } catch {
-            Write-Log "⚠️ Fehler beim Beenden der Sitzung (ggf. keine aktiv): $_" "WARNING"
+            Log "⚠️ Fehler beim Beenden der Sitzung (ggf. keine aktiv): $_" "WARNING"
         }
     }
 })
@@ -1093,9 +1093,9 @@ $form.ShowDialog() | Out-Null
 
 if ($script:WasAbgebrochen) {
     Write-Host "❌ Abbruch durch Benutzer" -ForegroundColor Red
-    Write-Log "❌ Abbruch durch Benutzer" "INFO"
+    Log "❌ Abbruch durch Benutzer" "INFO"
     # Disconnect-ExchangeOnline -Confirm:$false
-    # Write-Log "✅ Exchange Online Sitzung nach Abbruch durch Benutzer beendet." "INFO"
+    # Log "✅ Exchange Online Sitzung nach Abbruch durch Benutzer beendet." "INFO"
 
     exit 1
 }
@@ -1113,11 +1113,11 @@ return $form.Tag
 Connect-MFASessions
 
 # IPPS-Connect erfolgreich:
-    Write-Log "✅ IPPS verbunden" "SUCCESS"
+    Log "✅ IPPS verbunden" "SUCCESS"
 
 
 
-    Write-Log "🧭⌛ Lade GUI Ansicht, einen Moment bitte ..." "INFO"
+    Log "🧭⌛ Lade GUI Ansicht, einen Moment bitte ..." "INFO"
     # Optional: kannst du auch einen "⏳" oder "⌛" Emoji statt "🧭" verwenden
     # ..dann öffnet sich die GUI 🖥️
 
@@ -1126,8 +1126,8 @@ Connect-MFASessions
 
 # === GUI nutzen? Dann Werte überschreiben
 if ($UseLabelGUI) {
-    Write-Log "🧭 Lade GUI Ansicht, bitte einen Moment Geduld..." "INFO"
-    Start-SplashScreen -UseProgressBar:$UseProgressBar `
+    Log "🧭 Lade GUI Ansicht, bitte einen Moment Geduld..." "INFO"
+    Start-SplashInThread -UseProgressBar:$UseProgressBar `
                          -AutoCloseAfterSeconds:$AutoCloseAfterSeconds `
                          -CompanyLogoPath $CompanyLogoPath `
                          -CompanyLogoUrl $CompanyLogoUrl `
@@ -1149,12 +1149,12 @@ if ($UseLabelGUI) {
             -MailToSecondary $MailToSecondary
     } finally {
         # Splash garantieren schließen
-        Stop-SplashScreen
+        Stop-SplashThread
     }
 
     # Benutzerabbruch prüfen
     if (-not $guiResult -or $script:WasAbgebrochen) {
-        Write-Log "❌ GUI-Abbruch durch Benutzer – Skript wird beendet." "ERROR"
+        Log "❌ GUI-Abbruch durch Benutzer – Skript wird beendet." "ERROR"
         exit 1
     }
 
@@ -1165,7 +1165,7 @@ if ($UseLabelGUI) {
             if ($ln -is [string]) {
                 $LabelNames += $ln
             } else {
-                Write-Log "⚠️ Ungültiger Labelname ignoriert: $ln" "DEBUG"
+                Log "⚠️ Ungültiger Labelname ignoriert: $ln" "DEBUG"
             }
         }
     }
@@ -1189,7 +1189,7 @@ if ($UseLabelGUI) {
 # (SKRIPT FÄHRT HIER FORT MIT LABEL-LADEN, EXPORT, WORD/PDF, MAIL usw.)
 
 # === Labels laden (Name, GUI oder Priorität) ===
-# Write-Log "ℹ️ Prioritätsfilter wird geprüft (LabelNames leer, Priorities gesetzt: '$Priorities')" "DEBUG"
+# Log "ℹ️ Prioritätsfilter wird geprüft (LabelNames leer, Priorities gesetzt: '$Priorities')" "DEBUG"
 
 
 # === Fallback prüfen: Ist überhaupt eine Labelquelle definiert?
@@ -1199,7 +1199,7 @@ if (
     (-not $Priorities) -and
     (-not $UseExistingLabels)
 ) {
-    Write-LogError "❌ Keine gültigen Label-Quellen angegeben. Verwende -UseLabelGUI, -LabelNames oder -Priorities." ([System.Exception]::new("Keine Eingabequelle definiert"))
+    Handle-Error "❌ Keine gültigen Label-Quellen angegeben. Verwende -UseLabelGUI, -LabelNames oder -Priorities." ([System.Exception]::new("Keine Eingabequelle definiert"))
 }
 
 
@@ -1207,7 +1207,7 @@ if (
 $labels = @()
 
 if ($UseExistingLabels -or $LabelNames.Count -gt 0 -or $UseLabelGUI) {
-    Write-Log "📥 Lade Sensitivity Labels..." "INFO"
+    Log "📥 Lade Sensitivity Labels..." "INFO"
 
         if ($UseExistingLabels -and
         $LabelNames.Count -eq 0 -and
@@ -1216,7 +1216,7 @@ if ($UseExistingLabels -or $LabelNames.Count -gt 0 -or $UseLabelGUI) {
         $PriorityMin -eq 0 -and
         $PriorityMax -eq 0
     ) {
-        Write-Log "⚠️ Es wurden keine Prioritätsfilter oder Labelnamen angegeben – alle Labels werden geladen." "WARNING"
+        Log "⚠️ Es wurden keine Prioritätsfilter oder Labelnamen angegeben – alle Labels werden geladen." "WARNING"
     }
 
 
@@ -1225,9 +1225,9 @@ if ($UseExistingLabels -or $LabelNames.Count -gt 0 -or $UseLabelGUI) {
             try {
                 $label = Get-Label -Identity $name
                 $labels += $label
-                Write-Log "✅ Label geladen: $name" "SUCCESS"
+                Log "✅ Label geladen: $name" "SUCCESS"
             } catch {
-                Write-Log "❌ Fehler beim Laden von Label '$name': $_" "ERROR"
+                Log "❌ Fehler beim Laden von Label '$name': $_" "ERROR"
             }
         }
     } else {
@@ -1236,32 +1236,32 @@ if ($UseExistingLabels -or $LabelNames.Count -gt 0 -or $UseLabelGUI) {
 
         if ($Priority -gt 0) {
             $filtered = $allLabels | Where-Object { $_.Priority -eq $Priority }
-            Write-Log "🎯 Filter: Priorität = $Priority" "DEBUG"
+            Log "🎯 Filter: Priorität = $Priority" "DEBUG"
         } elseif ($PriorityMin -gt 0 -and $PriorityMax -gt 0) {
             $filtered = $allLabels | Where-Object { $_.Priority -ge $PriorityMin -and $_.Priority -le $PriorityMax }
-            Write-Log "🎯 Filter: Prioritäten von $PriorityMin bis $PriorityMax" "DEBUG"
+            Log "🎯 Filter: Prioritäten von $PriorityMin bis $PriorityMax" "DEBUG"
         } elseif ($PriorityMin -gt 0) {
             $filtered = $allLabels | Where-Object { $_.Priority -ge $PriorityMin }
-            Write-Log "🎯 Filter: Prioritäten ab $PriorityMin" "DEBUG"
+            Log "🎯 Filter: Prioritäten ab $PriorityMin" "DEBUG"
         } else {
             $filtered = $allLabels
-            Write-Log "🎯 Keine Prioritätsfilter – alle Labels geladen" "DEBUG"
+            Log "🎯 Keine Prioritätsfilter – alle Labels geladen" "DEBUG"
         }
 
         foreach ($entry in $filtered) {
             try {
                 $label = Get-Label -Identity $entry.Name
                 $labels += $label
-                Write-Log "✅ Label geladen: $($entry.Name)" "SUCCESS"
+                Log "✅ Label geladen: $($entry.Name)" "SUCCESS"
             } catch {
-                Write-Log "❌ Fehler bei Get-Label -Identity '$($entry.Name)': $_" "ERROR"
+                Log "❌ Fehler bei Get-Label -Identity '$($entry.Name)': $_" "ERROR"
             }
-        Write-Log "📄🖥️ Erzeuge Word-Bericht... Bitte warten...." "INFO"
+        Log "📄🖥️ Erzeuge Word-Bericht... Bitte warten...." "INFO"
         }
     }
 
     if (-not $labels -or $labels.Count -eq 0) {
-        Write-LogError "⚠️ Keine Labels gefunden" ([System.Exception]::new("Leere Ergebnismenge"))
+        Handle-Error "⚠️ Keine Labels gefunden" ([System.Exception]::new("Leere Ergebnismenge"))
     }
 }
 
@@ -1287,28 +1287,28 @@ try {
     if (-not $DryRun) {
     $exportData | Export-Csv -Path $StatusReportCsv -NoTypeInformation -Encoding UTF8
     $exportData | Export-Excel -Path ($StatusReportCsv -replace '.csv$', '.xlsx') -AutoSize
-    Write-Log "📄 CSV und Excel mit Label-Metadaten exportiert." "SUCCESS"
+    Log "📄 CSV und Excel mit Label-Metadaten exportiert." "SUCCESS"
 } else {
-    Write-Log "🧪 DryRun – CSV/Excel-Export übersprungen." "DEBUG"
+    Log "🧪 DryRun – CSV/Excel-Export übersprungen." "DEBUG"
 }
 
     # $exportData | Export-Csv -Path $StatusReportCsv -NoTypeInformation -Encoding UTF8
     # $exportData | Export-Excel -Path ($StatusReportCsv -replace '.csv$', '.xlsx') -AutoSize
 
-    Write-Log "📄 CSV und Excel mit Label-Metadaten exportiert." "SUCCESS" -Encoding utf8
+    Log "📄 CSV und Excel mit Label-Metadaten exportiert." "SUCCESS" -Encoding utf8
 } catch {
-    Write-LogError "Fehler beim Export der Label-Metadaten" $_
+    Handle-Error "Fehler beim Export der Label-Metadaten" $_
 }
 
 
-Write-Log "📑 Export in Word/PDF gestartet mit $($labels.Count) Label(s)." "INFO"
+Log "📑 Export in Word/PDF gestartet mit $($labels.Count) Label(s)." "INFO"
 foreach ($l in $labels) {
-    Write-Log "➡️  Label: $($l.DisplayName)" "DEBUG" -Encoding utf8
+    Log "➡️  Label: $($l.DisplayName)" "DEBUG" -Encoding utf8
 }
 
 # === Prüfung bzgl. leerer Labels ===
 if (-not $labels -or $labels.Count -eq 0) {
-    Write-Log "⚠️ WARNUNG: Keine Labels im Speicher – Testlabel wird eingefügt." "WARNING" -Encoding utf8
+    Log "⚠️ WARNUNG: Keine Labels im Speicher – Testlabel wird eingefügt." "WARNING" -Encoding utf8
 
     $labels = @(
         [PSCustomObject]@{
@@ -1333,7 +1333,7 @@ if ($ExportWord -or $ExportPDF) {
 #    Start-ConsoleSpinner -Message "📄 Erzeuge Word-Bericht..."
 
     if ($DryRun) {
-        Write-Log "🧪 DryRun – Word/PDF-Erstellung übersprungen." "WARNING"
+        Log "🧪 DryRun – Word/PDF-Erstellung übersprungen." "WARNING"
     } else {
 
     try {
@@ -1650,12 +1650,12 @@ if ($label.PSObject.Properties["LabelActions"] -and $label.LabelActions) {
         # === Speichern ===
         if ($ExportWord) {
             $doc.SaveAs($WordPath, 16)
-            Write-Log "📄 Word gespeichert: $WordPath" "SUCCESS"
+            Log "📄 Word gespeichert: $WordPath" "SUCCESS"
         }
 
         if ($ExportPDF) {
             $doc.SaveAs($PdfPath, 17)
-            Write-Log "📄 PDF gespeichert: $PdfPath" "SUCCESS"
+            Log "📄 PDF gespeichert: $PdfPath" "SUCCESS"
         }
 
         # === Dokument schließen ===
@@ -1682,6 +1682,7 @@ if ($label.PSObject.Properties["LabelActions"] -and $label.LabelActions) {
 }
 # Stop-ConsoleSpinner
 }
+
 
 # === Druck per Company ================
 # Aufruf: Export-CompanyReports -Labels $labels -OutputRoot "C:\Reports\Company-Reports"
@@ -1723,8 +1724,33 @@ function Export-CompanyReports {
 
         $datum = Get-Date -Format 'yyyyMMdd_HHmmss'
 
-        $WordPath = [System.IO.Path]::Combine($LogFolder, "PurviewExport_$companyName-$Buchungscode-$datum.docx")
-        $PdfPath  = [System.IO.Path]::Combine($LogFolder, "PurviewExport_$companyName-$Buchungscode-$datum.pdf")
+        # Hilfsfunktion zur Dateinamen-Bereinigung
+        function Convert-CompanyNameToFileName {
+            param([string]$Name)
+            $Name = $Name -replace 'ä', 'ae'
+            $Name = $Name -replace 'ö', 'oe'
+            $Name = $Name -replace 'ü', 'ue'
+            $Name = $Name -replace 'Ä', 'Ae'
+            $Name = $Name -replace 'Ö', 'Oe'
+            $Name = $Name -replace 'Ü', 'Ue'
+            $Name = $Name -replace 'ß', 'ss'
+            $Name = $Name -replace '[ &]', ''     # Leerzeichen UND & durch _
+            # Optional: Entferne weitere nicht-erlaubte Dateisystemzeichen:
+            $Name = $Name -replace '[^a-zA-Z0-9_\-]', '_'
+            return $Name
+        }
+
+        # CompanyName aufbereiten:
+        $companyNameFile = Convert-CompanyNameToFileName $companyName
+
+        $WordPath = [System.IO.Path]::Combine($outputDir, "PurviewExport_${companyNameFile}-$Buchungscode-$datum.docx")
+        $PdfPath  = [System.IO.Path]::Combine($outputDir, "PurviewExport_${companyNameFile}-$Buchungscode-$datum.pdf")
+        
+        # $WordPath = [System.IO.Path]::Combine($LogFolder, "PurviewExport_${companyNameFile}-$Buchungscode-$datum.docx")
+        # $PdfPath  = [System.IO.Path]::Combine($LogFolder, "PurviewExport_${companyNameFile}-$Buchungscode-$datum.pdf")
+
+        # $WordPath = [System.IO.Path]::Combine($LogFolder, "PurviewExport_$companyName-$Buchungscode-$datum.docx")
+        # $PdfPath  = [System.IO.Path]::Combine($LogFolder, "PurviewExport_$companyName-$Buchungscode-$datum.pdf")
 
         Write-Host "📄 WordPath = $WordPath"
         Write-Host "📄 PdfPath  = $PdfPath"
@@ -1736,30 +1762,309 @@ function Export-CompanyReports {
         $doc = $word.Documents.Add()
         $selection = $word.Selection
 
-        # Deckblatt
+#        # Deckblatt
+#        $selection.Style = "Titel"
+#        $selection.TypeText("M365 Purview Sensitivity Labels – $Tenantdomain")
+#        $selection.TypeParagraph()
+#        $selection.TypeText("Company: $companyName")
+#        $selection.TypeParagraph()
+#        $selection.TypeText("Erstellt am: $(Get-Date -Format 'dd.MM.yyyy')")
+#        $selection.InsertNewPage()
+
+#        # Inhalt pro Label
+#        foreach ($label in $LabelsBlock) {
+#            $selection.Style = "Überschrift 1"
+#            $selection.TypeText($label.DisplayName)
+#            $selection.TypeParagraph()
+#
+#            $selection.Style = "Standard"
+#            $selection.TypeText("Tooltip: $($label.Tooltip)")
+#            $selection.TypeParagraph()
+#            $selection.TypeText("Priority: $($label.Priority)")
+#            $selection.TypeParagraph()
+#            $selection.TypeText("Description: $($label.Description)")
+#            $selection.TypeParagraph()
+#            $selection.InsertNewPage()
+#        }
+
+
+
+    # === Deckblatt: Abschnitt 1 - Company Logo (oben zentriert) ===
+    if ($CompanyLogoPath -and (Test-Path $CompanyLogoPath)) {
+        $selection.ParagraphFormat.Alignment = 1
+        $selection.InlineShapes.AddPicture($CompanyLogoPath, $false, $true)
+        $selection.TypeParagraph()
+        $selection.TypeParagraph()
+    }
+    elseif ($CompanyLogoBase64 -and $CompanyLogoBase64.Length -gt 100) {
+        $bytes = [Convert]::FromBase64String(($CompanyLogoBase64 -replace '^data:image\/[a-z]+;base64,', ''))
+        $LogoFile = [System.IO.Path]::Combine($LogFolder, "CompanyLogo_$DatumJetzt.png")
+        [IO.File]::WriteAllBytes($LogoFile, $bytes)
+        $selection.ParagraphFormat.Alignment = 1
+        $selection.InlineShapes.AddPicture($LogoFile, $false, $true)
+        $selection.TypeParagraph()
+        $selection.TypeParagraph()
+    }
+
+    # === Abschnitt 2 - Titel und Metadaten ===
         $selection.Style = "Titel"
         $selection.TypeText("M365 Purview Sensitivity Labels – $Tenantdomain")
         $selection.TypeParagraph()
-        $selection.TypeText("Company: $companyName")
+        $selection.TypeText("Erstellt am: $DatumAnzeige")
         $selection.TypeParagraph()
-        $selection.TypeText("Erstellt am: $(Get-Date -Format 'dd.MM.yyyy')")
+        $selection.TypeText("Autor: Microsoft Purview Automation - BDO Digital GmbH")
+        $selection.TypeParagraph()
+        $selection.TypeParagraph()
+    
+    # === Abschnitt 3 - Produktlogo (unten zentriert) ===
+    if ($LogoUrl -and $LogoUrl.Trim() -ne "") {
+        $LogoFile = [System.IO.Path]::Combine($LogFolder, "ProductLogo_$DatumJetzt.png")
+        $wc = New-Object Net.WebClient
+        $wc.DownloadFile($LogoUrl, $LogoFile)
+        $selection.ParagraphFormat.Alignment = 1
+        $shape = $selection.InlineShapes.AddPicture($LogoFile, $false, $true)
+        $shape.Width  = $shape.Width * 0.5
+        $shape.Height = $shape.Height * 0.5
+    }
+    elseif ($ProductLogoBase64 -and $ProductLogoBase64.Length -gt 100) {
+        $bytes = [Convert]::FromBase64String(($ProductLogoBase64 -replace '^data:image\/[a-z]+;base64,', ''))
+        $LogoFile = [System.IO.Path]::Combine($LogFolder, "ProductLogo_$DatumJetzt.png")
+        [IO.File]::WriteAllBytes($LogoFile, $bytes)
+        $selection.ParagraphFormat.Alignment = 1
+        $shape = $selection.InlineShapes.AddPicture($LogoFile, $false, $true)
+        $shape.Width  = $shape.Width * 0.5
+        $shape.Height = $shape.Height * 0.5
+    }
+
+
+    # === Neue Seite für Inhaltsverzeichnis ===
         $selection.InsertNewPage()
 
-        # Inhalt pro Label
-        foreach ($label in $LabelsBlock) {
-            $selection.Style = "Überschrift 1"
-            $selection.TypeText($label.DisplayName)
+
+        # === Inhaltsverzeichnis ===
+        $tocRange = $selection.Range
+
+
+        # Inhaltsverzeichnis an den Anfang setzen
+        # $range = $doc.Range(0,0)
+
+        # TOC mit Hyperlinks, Ebene 1–3
+        # Beispiel: Fügt ein Inhaltsverzeichnis hinzu mit den gewünschten Optionen
+        $missing = [System.Type]::Missing
+
+        $doc.TablesOfContents.Add(
+            $tocRange,
+            $true,      # UseHeadingStyles
+            1,          # UpperHeadingLevel
+            3,          # LowerHeadingLevel
+            $true,      # UseFields
+            "",         # TableID
+            $true,      # RightAlignPageNumbers
+            $true,      # IncludePageNumbers
+            $missing,   # AddedStyles
+            $true,      # UseHyperlinks
+            $false      # HidePageNumbersInWeb
+            )
+
+        $selection.InsertNewPage()
+
+            # === Fußzeile korrekt formatieren ===
+                $section = $doc.Sections.Item(1)
+                $section.PageSetup.DifferentFirstPageHeaderFooter = $true
+                $footer = $section.Footers.Item([Microsoft.Office.Interop.Word.WdHeaderFooterIndex]::wdHeaderFooterPrimary)
+                $footerRange = $footer.Range
+
+            # Leeren und Tabstop hinzufügen
+                $footerRange.Text = ""
+                $footerRange.ParagraphFormat.TabStops.ClearAll()
+                $footerRange.ParagraphFormat.TabStops.Add(16 * 28.35, [Microsoft.Office.Interop.Word.WdTabAlignment]::wdAlignTabRight)
+
+            # Linker Text: "Seite: [Feld]"
+                $leftRange = $footerRange.Duplicate
+                $leftRange.InsertAfter("Seite: ")
+                $leftRange.Collapse([Microsoft.Office.Interop.Word.WdCollapseDirection]::wdCollapseEnd)
+                $leftRange.Fields.Add($leftRange, [Microsoft.Office.Interop.Word.WdFieldType]::wdFieldPage)
+
+            # Rechter Text mit Tab + Datum
+                $rightRange = $footerRange.Duplicate
+                $rightRange.Collapse([Microsoft.Office.Interop.Word.WdCollapseDirection]::wdCollapseEnd)
+                $rightRange.InsertAfter("`terstellt am: $DatumAnzeige")
+
+            # Formatierung
+                $footer.Range.Font.Name = "Arial"
+                $footer.Range.Font.Size = 9
+
+        
+# === Labels einfügen ===
+foreach ($label in $labels | Sort-Object Priority) {
+    $selection.Style = "Überschrift 1"
+    $selection.TypeText($label.DisplayName)
+    $selection.TypeParagraph()
+    $selection.TypeParagraph()
+
+    $selection.Style = "Standard"
+    $selection.Font.Size = 11
+    $selection.Font.Bold = $false
+
+    # === Basisinformationen einfügen ===
+    $properties = @{
+        "Tooltip"         = $label.Tooltip
+        "Priority"        = $label.Priority
+        "Description"     = $label.Description
+        "ContentType"     = $label.ContentType
+        "Enabled"         = $label.Enabled
+        "Id"              = $label.ImmutableId
+        "PublisherName"   = $label.PublisherName
+        "LastModified"    = $label.LastModifiedDateTime
+    }
+
+    foreach ($key in $properties.Keys) {
+        $selection.TypeText("${key}: ")
+        $selection.Font.Bold = $true
+        $selection.TypeText("$($properties[$key])")
+        $selection.Font.Bold = $false
+        $selection.TypeParagraph()
+    }
+
+
+# === LocaleSettings (strukturierte Sprachwerte aus JSON) ===
+# === LocaleSettings (strukturierte Sprachwerte bei nicht-standardisiertem JSON) ===
+foreach ($prop in $label.PSObject.Properties) {
+    if ($prop.Name -eq "LocaleSettings") {
+        try {
+            $selection.Style = "Überschrift 2"
+            $selection.TypeText("Locale Settings")
             $selection.TypeParagraph()
 
-            $selection.Style = "Standard"
-            $selection.TypeText("Tooltip: $($label.Tooltip)")
-            $selection.TypeParagraph()
-            $selection.TypeText("Priority: $($label.Priority)")
-            $selection.TypeParagraph()
-            $selection.TypeText("Description: $($label.Description)")
-            $selection.TypeParagraph()
-            $selection.InsertNewPage()
+            # Einige Backends liefern mehrere JSON-Objekte hintereinander als String
+            $raw = $prop.Value -replace '}\s*{','}|SPLIT|{'
+            $jsonParts = $raw -split '\|SPLIT\|'
+
+            $locales = @{}
+
+            foreach ($part in $jsonParts) {
+                $obj = $part | ConvertFrom-Json -ErrorAction Stop
+                $localeKey = $obj.LocaleKey  # z. B. displayName, tooltip
+
+                foreach ($entry in $obj.Settings) {
+                    $lang = $entry.Key
+                    $value = $entry.Value
+
+                    if (-not $locales.ContainsKey($lang)) {
+                        $locales[$lang] = @{}
+                    }
+                    $locales[$lang][$localeKey] = $value
+                }
+            }
+
+            # Ausgabe pro Sprache
+            foreach ($lang in ($locales.Keys | Sort-Object)) {
+                    $selection.Style = "Überschrift 3"
+                    $selection.TypeText("Sprache: $lang")
+                    $selection.TypeParagraph()
+                    $selection.Style = "Standard"
+
+                $entry = $locales[$lang]
+
+                if ($entry.displayName) {
+                    $selection.TypeText("   • Name: $($entry.displayName)")
+                    $selection.TypeParagraph()
+                }
+                if ($entry.tooltip) {
+                    $selection.TypeText("   • Tooltip: $($entry.tooltip)")
+                    $selection.TypeParagraph()
+                }
+                if ($entry.description) {
+                    $selection.TypeText("   • Description: $($entry.description)")
+                    $selection.TypeParagraph()
+                }
+
+#                $selection.TypeParagraph()
+            }
         }
+        catch {
+            $selection.TypeText("⚠️ Fehler beim Verarbeiten von LocaleSettings")
+            $selection.TypeParagraph()
+            $selection.TypeText($_.Exception.Message)
+            $selection.TypeParagraph()
+        }
+    }
+}
+
+    # === LabelActionsJson (falls vorhanden) ===
+# === LabelActionsJson (strukturierte Verarbeitung mehrerer JSON-Objekte im String) ===
+# if ($label.PSObject.Properties["LabelActionsJson"] -and $label.LabelActionsJson) {
+if ($label.PSObject.Properties["LabelActions"] -and $label.LabelActions) {
+    try {
+        $selection.Style = "Überschrift 2"
+        $selection.TypeText("Label Actions")
+        $selection.TypeParagraph()
+
+        # Schritt 1: Rohdaten auslesen
+        $raw = $label.LabelActions
+
+        # Schritt 2: JSON-Objekte voneinander trennen
+        $normalized = $raw -replace '}\s*{','}|SPLIT|{'
+        $jsonParts = $normalized -split '\|SPLIT\|'
+
+        foreach ($part in $jsonParts) {
+            $action = $part | ConvertFrom-Json -ErrorAction Stop
+
+            $type = $action.Type
+            $subtype = if ($action.SubType) { $action.SubType } else { "-" }
+
+            $selection.Style = "Überschrift 3"
+            $selection.TypeText("Aktion: $type")
+            $selection.TypeParagraph()
+            $selection.Style = "Standard"
+            $selection.TypeText("Untertyp: $subtype")
+            $selection.TypeParagraph()
+
+            foreach ($setting in $action.Settings) {
+                $key = $setting.Key
+                $value = $setting.Value
+
+                # Spezialfall: rightsdefinitions (JSON-Array als String)
+                if ($key -eq "rightsdefinitions" -and $value -match '^\s*\[') {
+                    $selection.TypeText(" - ${key}:")
+                    $selection.TypeParagraph()
+                    try {
+                        $rights = $value | ConvertFrom-Json -ErrorAction Stop
+                        foreach ($entry in $rights) {
+                            $selection.TypeText("     • Identity: $($entry.Identity)")
+                            $selection.TypeParagraph()
+                            $selection.TypeText("       Rights: $($entry.Rights)")
+                            $selection.TypeParagraph()
+                        }
+                    } catch {
+                        $selection.TypeText("     ⚠️ Fehler beim Parsen von rightsdefinitions")
+                        $selection.TypeParagraph()
+                    }
+                }
+                else {
+                    $selection.TypeText(" - ${key}: $value")
+                    $selection.TypeParagraph()
+                }
+            }
+
+#            $selection.TypeParagraph()
+        }
+    }
+    catch {
+        $selection.TypeText("⚠️ Fehler beim Verarbeiten von LabelActionsJson")
+        $selection.TypeParagraph()
+        $selection.TypeText($_.Exception.Message)
+        $selection.TypeParagraph()
+    }
+}
+    $selection.InsertNewPage()
+}
+       
+        # === Inhaltsverzeichnis aktualisieren ===
+        $doc.TablesOfContents.Item(1).Update()
+
+
+
 
         # Speichern
         $doc.SaveAs($wordPath, 16)
@@ -1839,10 +2144,10 @@ Microsoft Security & Compliance Automation
 
         Send-MailMessage @mailParams
 
-        Write-Log "✅ Mail erfolgreich gesendet an $MailTo$(if ($MailCC) { " (CC: $MailCC)" })" "SUCCESS"
+        Log "✅ Mail erfolgreich gesendet an $MailTo$(if ($MailCC) { " (CC: $MailCC)" })" "SUCCESS"
     }
     catch {
-        Write-LogError "Fehler beim Mailversand" $_
+        Handle-Error "Fehler beim Mailversand" $_
     }
     finally {
         Remove-Item $utf8BodyPath -Force -ErrorAction SilentlyContinue
@@ -1851,4 +2156,4 @@ Microsoft Security & Compliance Automation
 
 
 Disconnect-ExchangeOnline -Confirm:$false
-Write-Log "✅ Exchange Online Sitzung beendet." "INFO"
+Log "✅ Exchange Online Sitzung beendet." "INFO"
